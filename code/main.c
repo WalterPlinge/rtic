@@ -7,11 +7,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIW_WINDOWS_UTF8
 #include "stb_image_write.h"
+#define STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
 
 
 
 #define global     static
-#define internal   static
+#define internal   static inline
 #define persistent static
 
 
@@ -64,12 +66,12 @@ internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add( MulS( A, 1.0 - 
 
 struct ray { v3 Pos, Dir; } typedef ray;
 
-internal ray NewRay      ( v3  Pos, v3   Dir ) { return (ray) {     Pos, Normalise(     Dir      ) }; }
-internal v3  PointOnRayAt( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS     ( Ray.Dir,  T  ) ); }
+internal ray NewRay       ( v3  Pos, v3   Dir ) { return (ray) {     Pos, Normalise(     Dir      ) }; }
+internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS     ( Ray.Dir,  T  ) ); }
 
 
 
-struct hit_info { v3 Point, Normal; real Distance; bool FrontFace; } typedef hit_info;
+struct hit_info { real Distance; v3 Point, Normal; bool FrontFace; } typedef hit_info;
 
 internal void
 SetFaceNormal (
@@ -119,23 +121,49 @@ HitSphere (
 
 
 
+struct world { sphere* Spheres; } typedef world;
+
+internal void FreeTheWorld ( world World ) { arrfree( World.Spheres ); }
+
+internal bool
+HitWorld (
+	ray       Ray,
+	world     World,
+	real      Near,
+	real      Far,
+	hit_info* Info
+) {
+	hit_info Tmp = { 0 };
+	bool     Hit = false;
+	real Closest = Far;
+
+	for ( int i = 0; i < arrlen( World.Spheres ); ++i ) {
+		if ( HitSphere( Ray, World.Spheres[i], Near, Closest, &Tmp ) ) {
+			Hit = true;
+			Closest = Tmp.Distance;
+			*Info = Tmp;
+		}
+	}
+
+	return Hit;
+}
+
+
+
 internal colour
 RayColour (
-	ray Ray
+	ray   Ray,
+	world World
 ) {
 	persistent real Near = 0.0001;
 	persistent real Far  = 1000.0;
-	persistent sphere Sphere = {
-		.Center = { 0.0, 1.0, 0.0 },
-		.Radius = 0.5,
-	};
 
 	hit_info Info = { 0 };
-	if ( HitSphere( Ray, Sphere, Near, Far, &Info ) ) {
+	if ( HitWorld( Ray, World, Near, Far, &Info ) ) {
 		return MulS( AddS( Info.Normal, 1.0), 0.5 );
 	}
 
-	persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
+	persistent colour Sky1 = { .R = 1.0, .G = 0.7, .B = 0.5 };
 	persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
 	real T = 0.5 * ( Ray.Dir.Z + 1.0 );
 	return Lerp( Sky1, Sky2, T );
@@ -152,8 +180,9 @@ struct image_buffer {
 } typedef image_buffer;
 
 internal void
-RenderSky (
-	image_buffer Image
+RenderWorld (
+	image_buffer Image,
+	world        World
 ) {
 	real AspectRatio    = (real) Image.Width / Image.Height;
 	real ViewportHeight = 2.0;
@@ -190,7 +219,7 @@ RenderSky (
 			     d = Sub( d,       Origin      );
 			ray  r = NewRay( Origin, d );
 
-			colour PixelColour = RayColour( r );
+			colour PixelColour = RayColour( r, World );
 
 			u1 Red   = (u1) ( 255.999 * PixelColour.R );
 			u1 Green = (u1) ( 255.999 * PixelColour.G );
@@ -206,26 +235,46 @@ RenderSky (
 
 
 
+internal world
+AWholeNewWorld (
+) {
+	world World = {
+		.Spheres = NULL,
+	};
+
+	for ( int i = 0; i < 3; i += 1 ) {
+		sphere Sphere = { .Center = { -1.0 + (real) i, 1.0, 0.0 }, .Radius = 0.5 };
+		arrput( World.Spheres, Sphere );
+	}
+
+	return World;
+}
+
+
+
 int
 main (
 ) {
 	puts( "START" );
 
-	#define WIDTH 200
-	#define HEIGHT 100
+	#define WIDTH 256
+	#define HEIGHT 144
 	#define RGBA 4
-	byte Buffer[ WIDTH * HEIGHT * RGBA ] = {0};
 
 	image_buffer Image = {
-		.Buffer = Buffer,
+		.Buffer = malloc( WIDTH * HEIGHT * RGBA ),
 		.Width  = WIDTH,
 		.Height = HEIGHT,
 		.Pitch  = WIDTH * RGBA
 	};
 
-	RenderSky( Image );
+	world World = AWholeNewWorld();
 
-	puts( "MIDDLE" );
+	puts( "RENDER" );
+
+	RenderWorld( Image, World );
+
+	puts( "SAVE" );
 
 	{ // Save buffer to PNG file
 		byte Filename[ UCHAR_MAX ];
@@ -241,4 +290,7 @@ main (
 	}
 
 	puts( "END" );
+
+	FreeTheWorld( World );
+	free( Image.Buffer );
 }

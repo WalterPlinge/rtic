@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <tgmath.h>
+#include <time.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIW_WINDOWS_UTF8
@@ -30,6 +31,11 @@
 
 
 
+#define TIMER_INIT() clock_t _timer = clock();
+#define TIMER_STAMP(s) printf_s( s ": %.3fs\n", (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
+
+
+
 int_least64_t  typedef s8;
 int_least32_t  typedef s4;
 int_least16_t  typedef s2;
@@ -48,6 +54,8 @@ double   typedef f2; // double precision
 float    typedef f1; // single precision
 
 f2       typedef real; // easy to swap precision
+
+u4       typedef rgba8;
 
 
 
@@ -275,7 +283,7 @@ HitSphere (
 
 struct world { sphere* Spheres; material* SphereMaterials; } typedef world;
 
-internal void FreeTheWorld ( world World ) { arrfree( World.Spheres ); }
+internal void FreeTheWorld ( world World ) { arrfree( World.Spheres ); arrfree( World.SphereMaterials ); }
 
 internal bool
 HitWorld (
@@ -507,34 +515,31 @@ RenderWorld (
 	image_buffer Image,
 	world        World
 ) {
-	persistent int Samples = 1 << 2;
-
 	v3     Position   = { 13.0, -3.0, 2.0 };
 	v3     Target     = {  0.0,  0.0, 0.0 };
 	v3     WorldUp    = {  0.0,  0.0, 1.0 };
 	real   vfov       = 20.0;
 	real   Aspect     = (real) Image.Width / Image.Height;
-	real   Aperture   = 0.1;
+	real   Aperture   = 0.2;
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
-	int MaxDepth = 1 << 4;
+	int Samples  = 1 << 1;
+	int MaxDepth = 1 << 3;
 
-	byte* Row = Image.Buffer;
-	for ( int y = 0;
-		y < Image.Height;
-		y += 1, Row += Image.Pitch // NOTE: increment row by pitch
-	) {
-		printf_s( "\rProgress: %.0f%% ", ( 100.0 * y ) / Image.Height );
-		u4* Pixel = (u4*) Row;
-		for ( int x = 0;
-			x < Image.Width;
-			x += 1, Pixel += 1 // NOTE: increment pixel
-		) {
+	int y;
+	#pragma omp parallel for
+	for ( y = 0; y < Image.Height; y += 1 ) {
+		persistent int Complete = 0;
+		printf_s( "\rProgress: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
+
+		rgba8* Row  = (u4*) ( (byte*) Image.Buffer + y * Image.Pitch );
+
+		for ( int x = 0; x < Image.Width; x += 1 ) {
+			rgba8* Pixel = Row + x;
+
 			colour PixelColour = { 0 };
 
-			int sx;
-			//#pragma omp parallel for
-			for ( sx = 0; sx < Samples; ++sx )
+			for ( int sx = 0; sx < Samples; ++sx )
 			for ( int sy = 0; sy < Samples; ++sy ) {
 				real su = (real) sx / Samples;
 				real sv = (real) sy / Samples;
@@ -570,6 +575,10 @@ main (
 ) {
 	puts( "START" );
 
+	srand( 2 );
+
+	TIMER_INIT();
+
 	#define WIDTH  256
 	#define HEIGHT 144
 	#define RGBA 4
@@ -583,11 +592,11 @@ main (
 
 	world World = AWholeNewWorld();
 
-	puts( "RENDER" );
+	TIMER_STAMP( "INIT  " );
 
 	RenderWorld( Image, World );
 
-	puts( "SAVE" );
+	TIMER_STAMP( "RENDER" );
 
 	{ // Save buffer to PNG file
 		byte Filename[ UCHAR_MAX ];
@@ -602,8 +611,11 @@ main (
 			Image.Pitch );
 	}
 
-	puts( "END" );
+	TIMER_STAMP( "SAVE  " );
+
 
 	FreeTheWorld( World );
 	free( Image.Buffer );
+
+	puts( "END" );
 }

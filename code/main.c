@@ -64,7 +64,7 @@ Random (
 }
 
 internal real
-RandomBetween (
+RandomRange (
 	real Min,
 	real Max
 ) {
@@ -86,11 +86,38 @@ internal v3   AddS      ( v3   A, real B         ) { return (v3) {  A.X + B  ,  
 internal v3   SubS      ( v3   A, real B         ) { return (v3) {  A.X - B  ,  A.Y - B  ,  A.Z - B   }; }
 internal v3   MulS      ( v3   A, real B         ) { return (v3) {  A.X * B  ,  A.Y * B  ,  A.Z * B   }; }
 internal v3   DivS      ( v3   A, real B         ) { return (v3) {  A.X / B  ,  A.Y / B  ,  A.Z / B   }; }
+internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
 internal real Dot       ( v3   A, v3   B         ) { return Sum( Mul( A, B ) ); }
 internal real Length2   ( v3   A                 ) { return Dot(      A, A   ); }
 internal real Length    ( v3   A                 ) { return sqrt(    Length2( A ) ); }
 internal v3   Normalise ( v3   A                 ) { return DivS( A, Length ( A ) ); }
 internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add( MulS( A, 1.0 - T ), MulS( B, T ) ); }
+internal v3   Reflect   ( v3   A, v3   N         ) { return Sub( A, MulS( N, 2.0 * Dot( A, N ) ) ); }
+
+internal v3 RandomV3() { return (v3) { Random(), Random(), Random() }; }
+internal v3 RandomBetweenV3 ( real Min, real Max ) {
+	return (v3) {
+		RandomRange( Min, Max ),
+		RandomRange( Min, Max ),
+		RandomRange( Min, Max ),
+	};
+}
+internal v3 RandomInUnitSphere() {
+	v3 p; while ( true ) {
+		p = RandomBetweenV3( -1.0, 1.0 );
+		if ( Length2( p ) >= 1 ) continue;
+		return p;
+	}
+}
+internal v3 RandomInHemisphere( v3 Normal ) {
+	v3 p = RandomInUnitSphere();
+	if ( Dot( p, Normal ) > 0.0 ) {
+		return p;
+	} else {
+		return Negate( p );
+	}
+}
+internal v3 RandomUnitVector() { return Normalise( RandomInUnitSphere() ); }
 
 
 
@@ -100,8 +127,12 @@ internal ray NewRay       ( v3  Pos, v3   Dir ) { return (ray) {     Pos, Normal
 internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS     ( Ray.Dir,  T  ) ); }
 
 
+enum material_type { Lambertian, Metal } typedef material_type;
+struct material { material_type Type; colour Albedo; } typedef material;
 
-struct hit_info { real Distance; v3 Point, Normal; bool FrontFace; } typedef hit_info;
+
+
+struct hit_info { real Distance; v3 Point, Normal; bool FrontFace; material Material; } typedef hit_info;
 
 internal void
 SetFaceNormal (
@@ -113,6 +144,37 @@ SetFaceNormal (
 	Info->Normal    = Info->FrontFace
 		? OutwardNormal
 		: Negate( OutwardNormal );
+}
+
+
+
+internal bool
+Scatter (
+	ray      Ray,
+	hit_info Info,
+	colour*  Attenuation,
+	ray*     Scattered
+) {
+	switch ( Info.Material.Type ) {
+		case Lambertian: {
+			v3 Dir = Add( Info.Normal, RandomUnitVector() );
+			if ( Dir.X < 1e-8 and Dir.Y < 1e-8 and Dir.Z < 1e-8 ) {
+				Dir = Info.Normal;
+			}
+			*Scattered   = NewRay( Info.Point, Dir );
+			*Attenuation = Info.Material.Albedo;
+			return true;
+		} break;
+
+		case Metal: {
+			v3 Reflected = Reflect( Ray.Dir, Info.Normal );
+			*Scattered   = NewRay( Info.Point, Reflected );
+			*Attenuation = Info.Material.Albedo;
+			return Dot( Scattered->Dir, Info.Normal ) > 0.0;
+		} break;
+	}
+
+	return false;
 }
 
 
@@ -151,7 +213,7 @@ HitSphere (
 
 
 
-struct world { sphere* Spheres; } typedef world;
+struct world { sphere* Spheres; material* SphereMaterials; } typedef world;
 
 internal void FreeTheWorld ( world World ) { arrfree( World.Spheres ); }
 
@@ -169,13 +231,43 @@ HitWorld (
 
 	for ( int i = 0; i < arrlen( World.Spheres ); ++i ) {
 		if ( HitSphere( Ray, World.Spheres[i], Near, Closest, &Tmp ) ) {
-			Hit     = true;
-			Closest = Tmp.Distance;
-			*Info   = Tmp;
+			Hit          = true;
+			Closest      = Tmp.Distance;
+			Tmp.Material = World.SphereMaterials[i];
+			*Info        = Tmp;
 		}
 	}
 
 	return Hit;
+}
+
+internal world
+AWholeNewWorld (
+) {
+	world World = {
+		.Spheres = NULL,
+	};
+
+	material GroundMat = { .Albedo = { 0.8, 0.8, 0.0 }, .Type = Lambertian };
+	material CenterMat = { .Albedo = { 0.7, 0.3, 0.3 }, .Type = Lambertian };
+	material LeftMat   = { .Albedo = { 0.8, 0.8, 0.8 }, .Type = Metal };
+	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal };
+
+	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius = 100.0 };
+	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =   0.5 };
+	sphere LeftSphere   = { .Center = { -1.0, 1.0,    0.0 }, .Radius =   0.5 };
+	sphere RightSphere  = { .Center = {  1.0, 1.0,    0.0 }, .Radius =   0.5 };
+
+	arrput( World.Spheres        , GroundSphere );
+	arrput( World.SphereMaterials, GroundMat    );
+	arrput( World.Spheres        , CenterSphere );
+	arrput( World.SphereMaterials, CenterMat    );
+	arrput( World.Spheres        , LeftSphere   );
+	arrput( World.SphereMaterials, LeftMat      );
+	arrput( World.Spheres        , RightSphere  );
+	arrput( World.SphereMaterials, RightMat     );
+
+	return World;
 }
 
 
@@ -183,10 +275,15 @@ HitWorld (
 internal colour
 RayColour (
 	ray   Ray,
-	world World
+	world World,
+	int   Depth
 ) {
 	persistent real Near = 0.0001;
 	persistent real Far  = 1000.0;
+
+	if ( Depth <= 0 ) {
+		return (colour) { 0.0, 0.0, 0.0 };
+	}
 
 	hit_info Info = { 0 };
 	if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
@@ -196,7 +293,22 @@ RayColour (
 		return Lerp( Sky1, Sky2, T );
 	}
 
-	return DivS( AddS( Info.Normal, 1.0), 2.0 );
+	// Render normals
+	//return DivS( AddS( Info.Normal, 1.0), 2.0 );
+
+	//v3 Target = Add( Info.Point, RandomInHemisphere( Info.Normal ) ); // Old papers
+	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomInUnitSphere() ); // Inaccurate lambertian
+	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomUnitVector() );
+	//v3 Dir    = Sub( Target, Info.Point );
+	//return DivS( RayColour( NewRay( Info.Point, Dir ), World, Depth - 1 ), 2.0 );
+
+	ray Scattered;
+	colour Attenuation;
+	if ( not Scatter( Ray, Info, &Attenuation, &Scattered ) ) {
+		return (colour) { 0.0, 0.0, 0.0 };
+	}
+
+	return Mul( Attenuation, RayColour( Scattered, World, Depth - 1 ) );
 }
 
 
@@ -263,8 +375,10 @@ RenderWorld (
 	image_buffer Image,
 	world        World
 ) {
-	camera Cam = NewCamera( Image.Width, Image.Height );
-	persistent int Samples = 1;
+	persistent int Samples = 4;
+
+	camera Cam   = NewCamera( Image.Width, Image.Height );
+	int MaxDepth = 10;
 
 	byte* Row = Image.Buffer;
 	for ( int y = 0;
@@ -289,10 +403,11 @@ RenderWorld (
 
 				ray  r = CameraRay( Cam, u, v );
 
-				PixelColour = Add( PixelColour, RayColour( r, World ) );
+				PixelColour = Add( PixelColour, RayColour( r, World, MaxDepth ) );
 			}
 
 			PixelColour = DivS( PixelColour, Samples * Samples );
+			PixelColour = Sqrt( PixelColour );
 
 			u1 Red   = (u1) ( 255.999 * CLAMP01( PixelColour.R ) );
 			u1 Green = (u1) ( 255.999 * CLAMP01( PixelColour.G ) );
@@ -305,23 +420,6 @@ RenderWorld (
 		}
 	}
 	puts( "\rProgress: DONE" );
-}
-
-
-
-internal world
-AWholeNewWorld (
-) {
-	world World = {
-		.Spheres = NULL,
-	};
-
-	sphere Sphere = { .Center = { 0.0, 1.0, 0.0 }, .Radius = 0.5 };
-	arrput( World.Spheres, Sphere );
-	Sphere = (sphere) { .Center = { 0.0, 1.0, -100.5 }, .Radius = 100.0 };
-	arrput( World.Spheres, Sphere );
-
-	return World;
 }
 
 

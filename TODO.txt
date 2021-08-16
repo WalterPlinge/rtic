@@ -1,1 +1,5 @@
-! BUG: sky noise for some reason
+! TODO
+? INFO
+* DONE
+
+* BUG: sky noise for some reason (was due to race condition from openmp on sample loops)

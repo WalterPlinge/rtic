@@ -127,8 +127,10 @@ internal ray NewRay       ( v3  Pos, v3   Dir ) { return (ray) {     Pos, Normal
 internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS     ( Ray.Dir,  T  ) ); }
 
 
+
 enum material_type { Lambertian, Metal } typedef material_type;
-struct material { material_type Type; colour Albedo; } typedef material;
+
+struct material { material_type Type; colour Albedo; real Roughness; } typedef material;
 
 
 
@@ -168,7 +170,8 @@ Scatter (
 
 		case Metal: {
 			v3 Reflected = Reflect( Ray.Dir, Info.Normal );
-			*Scattered   = NewRay( Info.Point, Reflected );
+			v3 Direction = Add( Reflected, MulS( RandomInUnitSphere(), Info.Material.Roughness ) );
+			*Scattered   = NewRay( Info.Point, Direction );
 			*Attenuation = Info.Material.Albedo;
 			return Dot( Scattered->Dir, Info.Normal ) > 0.0;
 		} break;
@@ -250,8 +253,8 @@ AWholeNewWorld (
 
 	material GroundMat = { .Albedo = { 0.8, 0.8, 0.0 }, .Type = Lambertian };
 	material CenterMat = { .Albedo = { 0.7, 0.3, 0.3 }, .Type = Lambertian };
-	material LeftMat   = { .Albedo = { 0.8, 0.8, 0.8 }, .Type = Metal };
-	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal };
+	material LeftMat   = { .Albedo = { 0.8, 0.8, 0.8 }, .Type = Metal, .Roughness = 0.3 };
+	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal, .Roughness = 1.0 };
 
 	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius = 100.0 };
 	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =   0.5 };
@@ -375,7 +378,7 @@ RenderWorld (
 	image_buffer Image,
 	world        World
 ) {
-	persistent int Samples = 4;
+	persistent int Samples = 1 << 3;
 
 	camera Cam   = NewCamera( Image.Width, Image.Height );
 	int MaxDepth = 10;

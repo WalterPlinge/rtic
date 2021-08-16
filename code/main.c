@@ -1,5 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <iso646.h>
+#include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <tgmath.h>
@@ -15,6 +16,10 @@
 #define global     static
 #define internal   static inline
 #define persistent static
+
+
+
+#define PI 3.14159265358979323846
 
 
 
@@ -73,9 +78,26 @@ RandomRange (
 
 
 
+internal real DegToRad ( real Degrees ) { return ( Degrees * PI ) / 180.0; }
+internal real RadToDeg ( real Radians ) { return ( Radians * 180.0 ) / PI; }
+
+
+internal real
+ReflectanceSchlick (
+	real Cosine,
+	real Index
+) {
+	real r0 = ( 1 - Index ) / ( 1 + Index );
+	r0 = r0 * r0;
+	return r0 + ( 1 - r0 ) * pow( 1 - Cosine, 5 );
+}
+
+
+
 union v3 { real e[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
 v3 typedef colour;
 
+internal bool NearZero  ( v3   A                 ) { return A.X < 1e-9 and A.Y < 1e-9 and A.Z < 1e-9;    }
 internal real Sum       ( v3   A                 ) { return         A.X +       A.Y +       A.Z        ; }
 internal v3   Negate    ( v3   A                 ) { return (v3) { -A.X      , -A.Y      , -A.Z       }; }
 internal v3   Add       ( v3   A, v3   B         ) { return (v3) {  A.X + B.X,  A.Y + B.Y,  A.Z + B.Z }; }
@@ -88,14 +110,21 @@ internal v3   MulS      ( v3   A, real B         ) { return (v3) {  A.X * B  ,  
 internal v3   DivS      ( v3   A, real B         ) { return (v3) {  A.X / B  ,  A.Y / B  ,  A.Z / B   }; }
 internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
 internal real Dot       ( v3   A, v3   B         ) { return Sum( Mul( A, B ) ); }
+internal v3   Cross     ( v3   A, v3   B         ) { return (v3) { A.Y*B.Z-A.Z*B.Y, A.Z*B.X-A.X*B.Z, A.X*B.Y-A.Y*B.X }; }
 internal real Length2   ( v3   A                 ) { return Dot(      A, A   ); }
 internal real Length    ( v3   A                 ) { return sqrt(    Length2( A ) ); }
 internal v3   Normalise ( v3   A                 ) { return DivS( A, Length ( A ) ); }
 internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add( MulS( A, 1.0 - T ), MulS( B, T ) ); }
 internal v3   Reflect   ( v3   A, v3   N         ) { return Sub( A, MulS( N, 2.0 * Dot( A, N ) ) ); }
+internal v3   Refract   ( v3   A, v3   N, real E ) {
+	real CosTheta = Dot( Negate( A ), N );
+	v3   OutPerp  = MulS( Add( A, MulS( N, CosTheta ) ) , E );
+	v3   OutPara  = MulS( N, -sqrt( fabs( 1.0 - Length2( OutPerp ) ) ) );
+	return Add( OutPerp, OutPara );
+}
 
 internal v3 RandomV3() { return (v3) { Random(), Random(), Random() }; }
-internal v3 RandomBetweenV3 ( real Min, real Max ) {
+internal v3 RandomRangeV ( real Min, real Max ) {
 	return (v3) {
 		RandomRange( Min, Max ),
 		RandomRange( Min, Max ),
@@ -103,9 +132,9 @@ internal v3 RandomBetweenV3 ( real Min, real Max ) {
 	};
 }
 internal v3 RandomInUnitSphere() {
-	v3 p; while ( true ) {
-		p = RandomBetweenV3( -1.0, 1.0 );
-		if ( Length2( p ) >= 1 ) continue;
+	while ( true ) {
+		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ) };
+		if ( Length2( p ) >= 1.0 ) continue;
 		return p;
 	}
 }
@@ -128,9 +157,9 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 
 
-enum material_type { Lambertian, Metal } typedef material_type;
+enum material_type { Lambertian, Metal, Dielectric } typedef material_type;
 
-struct material { material_type Type; colour Albedo; real Roughness; } typedef material;
+struct material { material_type Type; colour Albedo; real Roughness; real IndexOfRefraction; } typedef material;
 
 
 
@@ -160,8 +189,8 @@ Scatter (
 	switch ( Info.Material.Type ) {
 		case Lambertian: {
 			v3 Dir = Add( Info.Normal, RandomUnitVector() );
-			if ( Dir.X < 1e-8 and Dir.Y < 1e-8 and Dir.Z < 1e-8 ) {
-				Dir = Info.Normal;
+			while ( NearZero( Dir ) ) {
+				Dir = Add( Info.Normal, RandomUnitVector() );
 			}
 			*Scattered   = NewRay( Info.Point, Dir );
 			*Attenuation = Info.Material.Albedo;
@@ -174,6 +203,27 @@ Scatter (
 			*Scattered   = NewRay( Info.Point, Direction );
 			*Attenuation = Info.Material.Albedo;
 			return Dot( Scattered->Dir, Info.Normal ) > 0.0;
+		} break;
+
+		case Dielectric: {
+			*Attenuation      = (colour) { 1.0, 1.0, 1.0 };
+			real RefractRatio = Info.FrontFace
+				? ( 1.0 / Info.Material.IndexOfRefraction )
+				: Info.Material.IndexOfRefraction;
+
+			real CosTheta = Dot( Negate( Ray.Dir ), Info.Normal );
+			real SinTheta = sqrt( 1.0 - CosTheta * CosTheta );
+
+			bool CannotRefract = RefractRatio * SinTheta > 1.0;
+
+			v3 Direction;
+			if ( CannotRefract or ReflectanceSchlick( CosTheta, RefractRatio ) > Random() ) {
+				Direction = Reflect( Ray.Dir, Info.Normal );
+			} else {
+				Direction = Refract( Ray.Dir, Info.Normal, RefractRatio );
+			}
+			*Scattered = NewRay( Info.Point, Direction );
+			return true;
 		} break;
 	}
 
@@ -252,20 +302,23 @@ AWholeNewWorld (
 	};
 
 	material GroundMat = { .Albedo = { 0.8, 0.8, 0.0 }, .Type = Lambertian };
-	material CenterMat = { .Albedo = { 0.7, 0.3, 0.3 }, .Type = Lambertian };
-	material LeftMat   = { .Albedo = { 0.8, 0.8, 0.8 }, .Type = Metal, .Roughness = 0.3 };
-	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal, .Roughness = 1.0 };
+	material CenterMat = { .Albedo = { 0.1, 0.2, 0.5 }, .Type = Lambertian };
+	material LeftMat   = { .Type = Dielectric, .IndexOfRefraction = 1.5 };
+	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal, .Roughness = 0.0 };
 
-	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius = 100.0 };
-	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =   0.5 };
-	sphere LeftSphere   = { .Center = { -1.0, 1.0,    0.0 }, .Radius =   0.5 };
-	sphere RightSphere  = { .Center = {  1.0, 1.0,    0.0 }, .Radius =   0.5 };
+	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius =  100.0  };
+	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =    0.5  };
+	sphere LeftSphere   = { .Center = { -1.0, 1.0,    0.0 }, .Radius =    0.5  };
+	sphere LeftSphereIn = { .Center = { -1.0, 1.0,    0.0 }, .Radius = -  0.45 };
+	sphere RightSphere  = { .Center = {  1.0, 1.0,    0.0 }, .Radius =    0.5  };
 
 	arrput( World.Spheres        , GroundSphere );
 	arrput( World.SphereMaterials, GroundMat    );
 	arrput( World.Spheres        , CenterSphere );
 	arrput( World.SphereMaterials, CenterMat    );
 	arrput( World.Spheres        , LeftSphere   );
+	arrput( World.SphereMaterials, LeftMat      );
+	arrput( World.Spheres        , LeftSphereIn );
 	arrput( World.SphereMaterials, LeftMat      );
 	arrput( World.Spheres        , RightSphere  );
 	arrput( World.SphereMaterials, RightMat     );
@@ -316,43 +369,40 @@ RayColour (
 
 
 
-struct image_buffer {
-	// NOTE: Always 4 bytes in RR GG BB AA order
-	void* Buffer;
-	int   Width;
-	int   Height;
-	int   Pitch;
-} typedef image_buffer;
-
-
-
-struct camera { v3 Pos, Right, Up, TopLeft; } typedef camera;
+struct camera { v3 Pos, Width, Height, TopLeft; } typedef camera;
 
 internal camera
 NewCamera (
-	real Width,
-	real Height
+	v3   Position,
+	v3   Target,
+	v3   WorldUp,
+	real VerticalFieldOfView,
+	real AspectRatio
 ) {
-	real AspectRatio    = Width / Height;
-	real ViewportHeight = 2.0;
+	real Theta = DegToRad( VerticalFieldOfView );
+	real H     = tan( Theta / 2.0 );
+
+	real ViewportHeight = 2.0 * H;
 	real ViewportWidth  = AspectRatio * ViewportHeight;
-	real FocalLength    = 1.0;
 
-	v3 Origin  = { 0.0           , 0.0         , 0.0            };
-	v3 Right   = { ViewportWidth , 0.0         , 0.0            };
-	v3 Up      = { 0.0           , 0.0         , ViewportHeight };
-	v3 Forward = { 0.0           , FocalLength , 0.0            };
+	// Normals
+	v3 Forward = Normalise( Sub  ( Target , Position    ) );
+	v3 Right   = Normalise( Cross( Forward, WorldUp     ) );
+	v3 Up      =            Cross( Right  , Forward     )  ;
 
-	// Top Left = Origin - Half Right + Half Up + Forward
-	v3 TopLeft = Origin;
-	   TopLeft = Sub( TopLeft, DivS( Right  , 2.0 ) );
-	   TopLeft = Add( TopLeft, DivS( Up     , 2.0 ) );
-	   TopLeft = Add( TopLeft,       Forward        );
+	v3 Width   = MulS( Right  , ViewportWidth  );
+	v3 Height  = MulS( Up     , ViewportHeight );
+
+	// Top Left = Position - Half Width + Half Height + Forward
+	v3 TopLeft = Position;
+	   TopLeft = Sub( TopLeft, DivS( Width  , 2.0         ) );
+	   TopLeft = Add( TopLeft, DivS( Height , 2.0         ) );
+	   TopLeft = Add( TopLeft,       Forward                );
 
 	return (camera) {
-		.Pos     = Origin,
-		.Right   = Right,
-		.Up      = Up,
+		.Pos     = Position,
+		.Width   = Width,
+		.Height  = Height,
 		.TopLeft = TopLeft,
 	};
 }
@@ -363,13 +413,23 @@ CameraRay (
 	real   U,
 	real   V
 ) {
-	// Direction = Top Left + U * Right - V * Up - Origin
+	// Direction = Top Left + U * Width - V * Height - Origin
 	v3 Dir = Cam.TopLeft;
-	   Dir = Add( Dir, MulS( Cam.Right, U ) );
-	   Dir = Sub( Dir, MulS( Cam.Up   , V ) );
-	   Dir = Sub( Dir,       Cam.Pos        );
+	   Dir = Add( Dir, MulS( Cam.Width , U ) );
+	   Dir = Sub( Dir, MulS( Cam.Height, V ) );
+	   Dir = Sub( Dir,       Cam.Pos         );
 	return NewRay( Cam.Pos, Dir );
 }
+
+
+
+struct image_buffer {
+	// NOTE: Always 4 bytes in RR GG BB AA order
+	void* Buffer;
+	int   Width;
+	int   Height;
+	int   Pitch;
+} typedef image_buffer;
 
 
 
@@ -380,7 +440,11 @@ RenderWorld (
 ) {
 	persistent int Samples = 1 << 3;
 
-	camera Cam   = NewCamera( Image.Width, Image.Height );
+	camera Cam   = NewCamera(
+		(v3) { -2.0, -1.0, 2.0 },
+		(v3) {  0.0,  1.0, 0.0 },
+		(v3) {  0.0,  0.0, 1.0 },
+		20.0, (real) Image.Width / Image.Height );
 	int MaxDepth = 10;
 
 	byte* Row = Image.Buffer;
@@ -396,7 +460,9 @@ RenderWorld (
 		) {
 			colour PixelColour = { 0 };
 
-			for ( int sx = 0; sx < Samples; ++sx )
+			int sx;
+			//#pragma omp parallel for
+			for ( sx = 0; sx < Samples; ++sx )
 			for ( int sy = 0; sy < Samples; ++sy ) {
 				real su = (real) sx / Samples;
 				real sv = (real) sy / Samples;

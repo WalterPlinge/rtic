@@ -123,7 +123,7 @@ internal v3   Refract   ( v3   A, v3   N, real E ) {
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV3() { return (v3) { Random(), Random(), Random() }; }
+internal v3 RandomV() { return (v3) { Random(), Random(), Random() }; }
 internal v3 RandomRangeV ( real Min, real Max ) {
 	return (v3) {
 		RandomRange( Min, Max ),
@@ -147,6 +147,13 @@ internal v3 RandomInHemisphere( v3 Normal ) {
 	}
 }
 internal v3 RandomUnitVector() { return Normalise( RandomInUnitSphere() ); }
+internal v3 RandomInUnitDisc() {
+	while ( true ) {
+		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
+		if ( Length2( p ) >= 1.0 ) continue;
+		return p;
+	}
+}
 
 
 
@@ -159,7 +166,7 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 enum material_type { Lambertian, Metal, Dielectric } typedef material_type;
 
-struct material { material_type Type; colour Albedo; real Roughness; real IndexOfRefraction; } typedef material;
+struct material { material_type Type; colour Albedo; real Roughness; real RefractiveIndex; } typedef material;
 
 
 
@@ -208,8 +215,8 @@ Scatter (
 		case Dielectric: {
 			*Attenuation      = (colour) { 1.0, 1.0, 1.0 };
 			real RefractRatio = Info.FrontFace
-				? ( 1.0 / Info.Material.IndexOfRefraction )
-				: Info.Material.IndexOfRefraction;
+				? ( 1.0 / Info.Material.RefractiveIndex )
+				: Info.Material.RefractiveIndex;
 
 			real CosTheta = Dot( Negate( Ray.Dir ), Info.Normal );
 			real SinTheta = sqrt( 1.0 - CosTheta * CosTheta );
@@ -301,9 +308,10 @@ AWholeNewWorld (
 		.Spheres = NULL,
 	};
 
+#if 0
 	material GroundMat = { .Albedo = { 0.8, 0.8, 0.0 }, .Type = Lambertian };
 	material CenterMat = { .Albedo = { 0.1, 0.2, 0.5 }, .Type = Lambertian };
-	material LeftMat   = { .Type = Dielectric, .IndexOfRefraction = 1.5 };
+	material LeftMat   = { .Type = Dielectric, .RefractiveIndex = 1.5 };
 	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal, .Roughness = 0.0 };
 
 	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius =  100.0  };
@@ -322,6 +330,55 @@ AWholeNewWorld (
 	arrput( World.SphereMaterials, LeftMat      );
 	arrput( World.Spheres        , RightSphere  );
 	arrput( World.SphereMaterials, RightMat     );
+#else
+	sphere   GroundS = { .Center = { 0.0, 0.0, -1000.0 }, .Radius = 1000.0 };
+	material GroundM = { .Type = Lambertian, .Albedo = { 0.5, 0.5, 0.5 } };
+	arrput( World.Spheres        , GroundS );
+	arrput( World.SphereMaterials, GroundM );
+
+	for ( int a = -11; a < 11; ++a )
+	for ( int b = -11; b < 11; ++b ) {
+		real ChooseMat = Random();
+
+		material Mat;
+		sphere   Sphere = {
+			.Center = { a + 0.9 * Random(), b * 0.9 * Random(), 0.2 },
+			.Radius = 0.2
+		};
+
+		if ( Length( Sub( Sphere.Center, (v3) { 4.0, 0.0, 0.2 } ) ) > 0.9 ) {
+			if ( ChooseMat < 0.8 ) {
+				Mat.Type   = Lambertian;
+				Mat.Albedo = Mul( RandomV(), RandomV() );
+			} else if ( ChooseMat < 0.95 ) {
+				Mat.Type      = Metal;
+				Mat.Albedo    = RandomRangeV( 0.5, 1.0 );
+				Mat.Roughness = RandomRange( 0.0, 0.5 );
+			} else {
+				Mat.Type            = Dielectric;
+				Mat.RefractiveIndex = 1.5;
+			}
+
+			arrput( World.Spheres        , Sphere );
+			arrput( World.SphereMaterials, Mat    );
+		}
+	}
+
+	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius = 1.0 };
+	material Material1 = { .Type = Dielectric, .RefractiveIndex = 1.5 };
+	arrput( World.Spheres        , Sphere1   );
+	arrput( World.SphereMaterials, Material1 );
+
+	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0 };
+	material Material2 = { .Type = Lambertian, .Albedo = { 0.4, 0.2, 0.1 } };
+	arrput( World.Spheres        , Sphere2   );
+	arrput( World.SphereMaterials, Material2 );
+
+	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius = 1.0 };
+	material Material3 = { .Type = Metal     , .Albedo = { 0.7, 0.6, 0.5 }, .Roughness = 0.0 };
+	arrput( World.Spheres        , Sphere3   );
+	arrput( World.SphereMaterials, Material3 );
+#endif
 
 	return World;
 }
@@ -343,7 +400,7 @@ RayColour (
 
 	hit_info Info = { 0 };
 	if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
-		persistent colour Sky1 = { .R = 1.0, .G = 0.7, .B = 0.5 };
+		persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
 		persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
 		real T = ( Ray.Dir.Z + 1.0 ) / 2.0;
 		return Lerp( Sky1, Sky2, T );
@@ -369,7 +426,7 @@ RayColour (
 
 
 
-struct camera { v3 Pos, Width, Height, TopLeft; } typedef camera;
+struct camera { v3 Pos, TopLeft, Width, Height, Right, Forward, Up; real LensRadius; } typedef camera;
 
 internal camera
 NewCamera (
@@ -377,7 +434,8 @@ NewCamera (
 	v3   Target,
 	v3   WorldUp,
 	real VerticalFieldOfView,
-	real AspectRatio
+	real AspectRatio,
+	real Aperture
 ) {
 	real Theta = DegToRad( VerticalFieldOfView );
 	real H     = tan( Theta / 2.0 );
@@ -385,25 +443,32 @@ NewCamera (
 	real ViewportHeight = 2.0 * H;
 	real ViewportWidth  = AspectRatio * ViewportHeight;
 
+	v3 LookVector  = Sub( Target, Position );
+	real FocusDist = Length( LookVector );
+
 	// Normals
-	v3 Forward = Normalise( Sub  ( Target , Position    ) );
-	v3 Right   = Normalise( Cross( Forward, WorldUp     ) );
-	v3 Up      =            Cross( Right  , Forward     )  ;
+	v3 Forward = DivS     (        LookVector, FocusDist     );
+	v3 Right   = Normalise( Cross( Forward   , WorldUp     ) );
+	v3 Up      =            Cross( Right     , Forward     )  ;
 
-	v3 Width   = MulS( Right  , ViewportWidth  );
-	v3 Height  = MulS( Up     , ViewportHeight );
+	v3 Width   = MulS( Right  , FocusDist * ViewportWidth  );
+	v3 Height  = MulS( Up     , FocusDist * ViewportHeight );
 
-	// Top Left = Position - Half Width + Half Height + Forward
+	// Top Left = Position - Half Focus Width + Half Focus Height + Focus Forward
 	v3 TopLeft = Position;
 	   TopLeft = Sub( TopLeft, DivS( Width  , 2.0         ) );
 	   TopLeft = Add( TopLeft, DivS( Height , 2.0         ) );
-	   TopLeft = Add( TopLeft,       Forward                );
+	   TopLeft = Add( TopLeft, MulS( Forward, FocusDist   ) );
 
 	return (camera) {
-		.Pos     = Position,
-		.Width   = Width,
-		.Height  = Height,
-		.TopLeft = TopLeft,
+		.Pos        = Position,
+		.TopLeft    = TopLeft,
+		.Width      = Width,
+		.Height     = Height,
+		.Right      = Right,
+		.Forward    = Forward,
+		.Up         = Up,
+		.LensRadius = Aperture / 2.0,
 	};
 }
 
@@ -413,12 +478,16 @@ CameraRay (
 	real   U,
 	real   V
 ) {
-	// Direction = Top Left + U * Width - V * Height - Origin
+	v3 rd = MulS( RandomInUnitDisc(), Cam.LensRadius );
+	v3 Offset = Add( MulS( Cam.Right, rd.X ), MulS( Cam.Up, rd.Y ) );
+	// Direction = Top Left + U * Width - V * Height - Origin - Offset
+	v3 Pos = Add( Cam.Pos, Offset );
 	v3 Dir = Cam.TopLeft;
 	   Dir = Add( Dir, MulS( Cam.Width , U ) );
 	   Dir = Sub( Dir, MulS( Cam.Height, V ) );
 	   Dir = Sub( Dir,       Cam.Pos         );
-	return NewRay( Cam.Pos, Dir );
+	   Dir = Sub( Dir,       Offset          );
+	return NewRay( Pos, Dir );
 }
 
 
@@ -438,14 +507,17 @@ RenderWorld (
 	image_buffer Image,
 	world        World
 ) {
-	persistent int Samples = 1 << 3;
+	persistent int Samples = 1 << 2;
 
-	camera Cam   = NewCamera(
-		(v3) { -2.0, -1.0, 2.0 },
-		(v3) {  0.0,  1.0, 0.0 },
-		(v3) {  0.0,  0.0, 1.0 },
-		20.0, (real) Image.Width / Image.Height );
-	int MaxDepth = 10;
+	v3     Position   = { 13.0, -3.0, 2.0 };
+	v3     Target     = {  0.0,  0.0, 0.0 };
+	v3     WorldUp    = {  0.0,  0.0, 1.0 };
+	real   vfov       = 20.0;
+	real   Aspect     = (real) Image.Width / Image.Height;
+	real   Aperture   = 0.1;
+	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
+
+	int MaxDepth = 1 << 4;
 
 	byte* Row = Image.Buffer;
 	for ( int y = 0;
@@ -498,7 +570,7 @@ main (
 ) {
 	puts( "START" );
 
-	#define WIDTH 256
+	#define WIDTH  256
 	#define HEIGHT 144
 	#define RGBA 4
 

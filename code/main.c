@@ -20,6 +20,9 @@
 
 #define BETWEEN( x, a, b ) ( (a) < (x) and (x) < (b) )
 
+#define CLAMP(   x, a, b ) min( max( (x), (a) ), (b) )
+#define CLAMP01( x )          CLAMP( (x),  0,     1  )
+
 
 
 int_least64_t  typedef s8;
@@ -40,6 +43,33 @@ double   typedef f2; // double precision
 float    typedef f1; // single precision
 
 f2       typedef real; // easy to swap precision
+
+
+
+internal real
+Random (
+) {
+#if 1
+	return (real) rand() / ( RAND_MAX + 1 );
+#else
+	persistent real Temp;
+	persistent int  RandomC = 0;
+
+	real p = (real) ++RandomC;
+	p = modf( p * .1031, &Temp );
+	p *= p + 33.33;
+	p *= p + p;
+	return modf( p, &Temp );
+#endif
+}
+
+internal real
+RandomBetween (
+	real Min,
+	real Max
+) {
+	return Min + ( Max - Min ) * Random();
+}
 
 
 
@@ -113,8 +143,8 @@ HitSphere (
 		}
 	}
 
-	Info->Distance   = Root;
-	Info->Point      = PointOnRayAt( Ray, Root );
+	Info->Distance = Root;
+	Info->Point    = PointOnRayAt( Ray, Root );
 	SetFaceNormal( Info, Ray, DivS( Sub( Info->Point, Sphere.Center ), Sphere.Radius ) );
 	return true;
 }
@@ -139,9 +169,9 @@ HitWorld (
 
 	for ( int i = 0; i < arrlen( World.Spheres ); ++i ) {
 		if ( HitSphere( Ray, World.Spheres[i], Near, Closest, &Tmp ) ) {
-			Hit = true;
+			Hit     = true;
 			Closest = Tmp.Distance;
-			*Info = Tmp;
+			*Info   = Tmp;
 		}
 	}
 
@@ -159,14 +189,14 @@ RayColour (
 	persistent real Far  = 1000.0;
 
 	hit_info Info = { 0 };
-	if ( HitWorld( Ray, World, Near, Far, &Info ) ) {
-		return MulS( AddS( Info.Normal, 1.0), 0.5 );
+	if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
+		persistent colour Sky1 = { .R = 1.0, .G = 0.7, .B = 0.5 };
+		persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
+		real T = ( Ray.Dir.Z + 1.0 ) / 2.0;
+		return Lerp( Sky1, Sky2, T );
 	}
 
-	persistent colour Sky1 = { .R = 1.0, .G = 0.7, .B = 0.5 };
-	persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
-	real T = 0.5 * ( Ray.Dir.Z + 1.0 );
-	return Lerp( Sky1, Sky2, T );
+	return DivS( AddS( Info.Normal, 1.0), 2.0 );
 }
 
 
@@ -179,12 +209,16 @@ struct image_buffer {
 	int   Pitch;
 } typedef image_buffer;
 
-internal void
-RenderWorld (
-	image_buffer Image,
-	world        World
+
+
+struct camera { v3 Pos, Right, Up, TopLeft; } typedef camera;
+
+internal camera
+NewCamera (
+	real Width,
+	real Height
 ) {
-	real AspectRatio    = (real) Image.Width / Image.Height;
+	real AspectRatio    = Width / Height;
 	real ViewportHeight = 2.0;
 	real ViewportWidth  = AspectRatio * ViewportHeight;
 	real FocalLength    = 1.0;
@@ -195,35 +229,74 @@ RenderWorld (
 	v3 Forward = { 0.0           , FocalLength , 0.0            };
 
 	// Top Left = Origin - Half Right + Half Up + Forward
-	v3 TopLeft   = Origin;
-	   TopLeft   = Sub( TopLeft, DivS( Right  , 2.0 ) );
-	   TopLeft   = Add( TopLeft, DivS( Up     , 2.0 ) );
-	   TopLeft   = Add( TopLeft,       Forward        );
+	v3 TopLeft = Origin;
+	   TopLeft = Sub( TopLeft, DivS( Right  , 2.0 ) );
+	   TopLeft = Add( TopLeft, DivS( Up     , 2.0 ) );
+	   TopLeft = Add( TopLeft,       Forward        );
+
+	return (camera) {
+		.Pos     = Origin,
+		.Right   = Right,
+		.Up      = Up,
+		.TopLeft = TopLeft,
+	};
+}
+
+internal ray
+CameraRay (
+	camera Cam,
+	real   U,
+	real   V
+) {
+	// Direction = Top Left + U * Right - V * Up - Origin
+	v3 Dir = Cam.TopLeft;
+	   Dir = Add( Dir, MulS( Cam.Right, U ) );
+	   Dir = Sub( Dir, MulS( Cam.Up   , V ) );
+	   Dir = Sub( Dir,       Cam.Pos        );
+	return NewRay( Cam.Pos, Dir );
+}
+
+
+
+internal void
+RenderWorld (
+	image_buffer Image,
+	world        World
+) {
+	camera Cam = NewCamera( Image.Width, Image.Height );
+	persistent int Samples = 1;
 
 	byte* Row = Image.Buffer;
 	for ( int y = 0;
 		y < Image.Height;
 		y += 1, Row += Image.Pitch // NOTE: increment row by pitch
 	) {
+		printf_s( "\rProgress: %.0f%% ", ( 100.0 * y ) / Image.Height );
 		u4* Pixel = (u4*) Row;
 		for ( int x = 0;
 			x < Image.Width;
 			x += 1, Pixel += 1 // NOTE: increment pixel
 		) {
-			real u = (real) x / ( Image.Width  - 1 );
-			real v = (real) y / ( Image.Height - 1 );
-			// Direction = Top Left + U * Right - V * Up - Origin
-			v3   d = TopLeft;
-			     d = Add( d, MulS( Right , u ) );
-			     d = Sub( d, MulS( Up    , v ) );
-			     d = Sub( d,       Origin      );
-			ray  r = NewRay( Origin, d );
+			colour PixelColour = { 0 };
 
-			colour PixelColour = RayColour( r, World );
+			for ( int sx = 0; sx < Samples; ++sx )
+			for ( int sy = 0; sy < Samples; ++sy ) {
+				real su = (real) sx / Samples;
+				real sv = (real) sy / Samples;
 
-			u1 Red   = (u1) ( 255.999 * PixelColour.R );
-			u1 Green = (u1) ( 255.999 * PixelColour.G );
-			u1 Blue  = (u1) ( 255.999 * PixelColour.B );
+				real u = ( x + su ) / ( Image.Width  - 1 );
+				real v = ( y + sv ) / ( Image.Height - 1 );
+
+				ray  r = CameraRay( Cam, u, v );
+
+				PixelColour = Add( PixelColour, RayColour( r, World ) );
+			}
+
+			PixelColour = DivS( PixelColour, Samples * Samples );
+
+			u1 Red   = (u1) ( 255.999 * CLAMP01( PixelColour.R ) );
+			u1 Green = (u1) ( 255.999 * CLAMP01( PixelColour.G ) );
+			u1 Blue  = (u1) ( 255.999 * CLAMP01( PixelColour.B ) );
 			u1 Alpha = UCHAR_MAX;
 			*Pixel   = Red   << 0
 			         | Green << 8
@@ -231,6 +304,7 @@ RenderWorld (
 			         | Alpha << 24;
 		}
 	}
+	puts( "\rProgress: DONE" );
 }
 
 
@@ -242,10 +316,10 @@ AWholeNewWorld (
 		.Spheres = NULL,
 	};
 
-	for ( int i = 0; i < 3; i += 1 ) {
-		sphere Sphere = { .Center = { -1.0 + (real) i, 1.0, 0.0 }, .Radius = 0.5 };
-		arrput( World.Spheres, Sphere );
-	}
+	sphere Sphere = { .Center = { 0.0, 1.0, 0.0 }, .Radius = 0.5 };
+	arrput( World.Spheres, Sphere );
+	Sphere = (sphere) { .Center = { 0.0, 1.0, -100.5 }, .Radius = 100.0 };
+	arrput( World.Spheres, Sphere );
 
 	return World;
 }

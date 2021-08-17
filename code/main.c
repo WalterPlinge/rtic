@@ -69,6 +69,7 @@ internal real DegToRad ( real Degrees ) { return ( Degrees * PI ) / 180.0; }
 internal real RadToDeg ( real Radians ) { return ( Radians * 180.0 ) / PI; }
 
 
+
 internal real
 ReflectanceSchlick (
 	real Cosine,

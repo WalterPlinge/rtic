@@ -3,6 +3,7 @@
 #include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <tgmath.h>
 #include <time.h>
 
@@ -545,6 +546,8 @@ RenderWorld (
 
 int
 main (
+	int    argc,
+	char** argv
 ) {
 	puts( "START" );
 

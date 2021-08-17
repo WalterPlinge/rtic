@@ -1,7 +1,10 @@
 @echo off
 setlocal
 
-set CompilerFlags=-analyze- -FAasu -FC -fp:precise -MTd -Od -openmp- -std:c17 -TC -utf-8 -W3 -Zi
+set Debug=-fp:precise -Od
+set Release=-fp:fast -O2
+
+set CompilerFlags=%Debug% -analyze- -FAasu -FC -MTd -openmp -std:c17 -TC -utf-8 -W3 -Zi
 set LinkerFlags=-subsystem:console
 
 if not exist build mkdir build

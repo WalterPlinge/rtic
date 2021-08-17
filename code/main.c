@@ -27,7 +27,7 @@
 #define BETWEEN( x, a, b ) ( (a) < (x) and (x) < (b) )
 
 #define CLAMP(   x, a, b ) min( max( (x), (a) ), (b) )
-#define CLAMP01( x )          CLAMP( (x),  0,     1  )
+#define CLAMP_01( x )         CLAMP( (x),  0,     1  )
 
 
 
@@ -59,30 +59,8 @@ u4       typedef rgba8;
 
 
 
-internal real
-Random (
-) {
-#if 1
-	return (real) rand() / ( RAND_MAX + 1 );
-#else
-	persistent real Temp;
-	persistent int  RandomC = 0;
-
-	real p = (real) ++RandomC;
-	p = modf( p * .1031, &Temp );
-	p *= p + 33.33;
-	p *= p + p;
-	return modf( p, &Temp );
-#endif
-}
-
-internal real
-RandomRange (
-	real Min,
-	real Max
-) {
-	return Min + ( Max - Min ) * Random();
-}
+internal real Random     (                    ) { return (real) rand() / ( RAND_MAX + 1 ); }
+internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random(  ); }
 
 
 
@@ -119,27 +97,27 @@ internal v3   DivS      ( v3   A, real B         ) { return (v3) {  A.X / B  ,  
 internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
 internal real Dot       ( v3   A, v3   B         ) { return Sum( Mul( A, B ) ); }
 internal v3   Cross     ( v3   A, v3   B         ) { return (v3) { A.Y*B.Z-A.Z*B.Y, A.Z*B.X-A.X*B.Z, A.X*B.Y-A.Y*B.X }; }
-internal real Length2   ( v3   A                 ) { return Dot(      A, A   ); }
+internal real Length2   ( v3   A                 ) { return Dot ( A,          A   ); }
 internal real Length    ( v3   A                 ) { return sqrt(    Length2( A ) ); }
 internal v3   Normalise ( v3   A                 ) { return DivS( A, Length ( A ) ); }
-internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add( MulS( A, 1.0 - T ), MulS( B, T ) ); }
-internal v3   Reflect   ( v3   A, v3   N         ) { return Sub( A, MulS( N, 2.0 * Dot( A, N ) ) ); }
+internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add ( MulS( A, 1.0 - T ) , MulS( B, T )   ); }
+internal v3   Reflect   ( v3   A, v3   N         ) { return Sub ( A,    MulS( N, 2.0 * Dot ( A, N ) ) ); }
 internal v3   Refract   ( v3   A, v3   N, real E ) {
-	real CosTheta = Dot( Negate( A ), N );
-	v3   OutPerp  = MulS( Add( A, MulS( N, CosTheta ) ) , E );
-	v3   OutPara  = MulS( N, -sqrt( fabs( 1.0 - Length2( OutPerp ) ) ) );
+	real CosTheta = Dot ( Negate( A ),       N                               );
+	v3   OutPerp  = MulS( Add   ( A  , MulS( N,    CosTheta           ) ), E );
+	v3   OutPara  = MulS( N, -sqrt(    fabs( 1.0 - Length2( OutPerp ) ) )    );
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV() { return (v3) { Random(), Random(), Random() }; }
-internal v3 RandomRangeV ( real Min, real Max ) {
+internal v3 RandomV     (                    ) { return (v3) { Random(), Random(), Random() }; }
+internal v3 RandomRangeV( real Min, real Max ) {
 	return (v3) {
 		RandomRange( Min, Max ),
 		RandomRange( Min, Max ),
 		RandomRange( Min, Max ),
 	};
 }
-internal v3 RandomInUnitSphere() {
+internal v3 RandomInUnitSphere() { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ) };
 		if ( Length2( p ) >= 1.0 ) continue;
@@ -155,7 +133,7 @@ internal v3 RandomInHemisphere( v3 Normal ) {
 	}
 }
 internal v3 RandomUnitVector() { return Normalise( RandomInUnitSphere() ); }
-internal v3 RandomInUnitDisc() {
+internal v3 RandomInUnitDisc() { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
 		if ( Length2( p ) >= 1.0 ) continue;
@@ -188,7 +166,7 @@ SetFaceNormal (
 ) {
 	Info->FrontFace = Dot( Ray.Dir, OutwardNormal ) < 0.0;
 	Info->Normal    = Info->FrontFace
-		? OutwardNormal
+		?         OutwardNormal
 		: Negate( OutwardNormal );
 }
 
@@ -204,7 +182,7 @@ Scatter (
 	switch ( Info.Material.Type ) {
 		case Lambertian: {
 			v3 Dir = Add( Info.Normal, RandomUnitVector() );
-			while ( NearZero( Dir ) ) {
+			while ( NearZero( Dir ) ) { // HACK: infinite loop
 				Dir = Add( Info.Normal, RandomUnitVector() );
 			}
 			*Scattered   = NewRay( Info.Point, Dir );
@@ -224,7 +202,7 @@ Scatter (
 			*Attenuation      = (colour) { 1.0, 1.0, 1.0 };
 			real RefractRatio = Info.FrontFace
 				? ( 1.0 / Info.Material.RefractiveIndex )
-				: Info.Material.RefractiveIndex;
+				:         Info.Material.RefractiveIndex;
 
 			real CosTheta = Dot( Negate( Ray.Dir ), Info.Normal );
 			real SinTheta = sqrt( 1.0 - CosTheta * CosTheta );
@@ -313,7 +291,8 @@ internal world
 AWholeNewWorld (
 ) {
 	world World = {
-		.Spheres = NULL,
+		.Spheres         = NULL,
+		.SphereMaterials = NULL,
 	};
 
 #if 0
@@ -339,8 +318,8 @@ AWholeNewWorld (
 	arrput( World.Spheres        , RightSphere  );
 	arrput( World.SphereMaterials, RightMat     );
 #else
-	sphere   GroundS = { .Center = { 0.0, 0.0, -1000.0 }, .Radius = 1000.0 };
-	material GroundM = { .Type = Lambertian, .Albedo = { 0.5, 0.5, 0.5 } };
+	sphere   GroundS = { .Center = { 0.0, 0.0, -1000.0 }, .Radius = 1000.0     };
+	material GroundM = { .Albedo = { 0.5, 0.5,     0.5 }, .Type   = Lambertian };
 	arrput( World.Spheres        , GroundS );
 	arrput( World.SphereMaterials, GroundM );
 
@@ -361,7 +340,7 @@ AWholeNewWorld (
 			} else if ( ChooseMat < 0.95 ) {
 				Mat.Type      = Metal;
 				Mat.Albedo    = RandomRangeV( 0.5, 1.0 );
-				Mat.Roughness = RandomRange( 0.0, 0.5 );
+				Mat.Roughness = RandomRange ( 0.0, 0.5 );
 			} else {
 				Mat.Type            = Dielectric;
 				Mat.RefractiveIndex = 1.5;
@@ -373,17 +352,17 @@ AWholeNewWorld (
 	}
 
 	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius = 1.0 };
-	material Material1 = { .Type = Dielectric, .RefractiveIndex = 1.5 };
+	material Material1 = { .Type = Dielectric,  .RefractiveIndex = 1.5 };
 	arrput( World.Spheres        , Sphere1   );
 	arrput( World.SphereMaterials, Material1 );
 
-	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0 };
-	material Material2 = { .Type = Lambertian, .Albedo = { 0.4, 0.2, 0.1 } };
+	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0        };
+	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = Lambertian };
 	arrput( World.Spheres        , Sphere2   );
 	arrput( World.SphereMaterials, Material2 );
 
-	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius = 1.0 };
-	material Material3 = { .Type = Metal     , .Albedo = { 0.7, 0.6, 0.5 }, .Roughness = 0.0 };
+	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                };
+	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = Metal };
 	arrput( World.Spheres        , Sphere3   );
 	arrput( World.SphereMaterials, Material3 );
 #endif
@@ -417,7 +396,8 @@ RayColour (
 	// Render normals
 	//return DivS( AddS( Info.Normal, 1.0), 2.0 );
 
-	//v3 Target = Add( Info.Point, RandomInHemisphere( Info.Normal ) ); // Old papers
+	// Only lambertian diffuse
+	//v3 Target = Add( Info.Point, RandomInHemisphere( Info.Normal ) );        // Old papers
 	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomInUnitSphere() ); // Inaccurate lambertian
 	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomUnitVector() );
 	//v3 Dir    = Sub( Target, Info.Point );
@@ -446,27 +426,27 @@ NewCamera (
 	real Aperture
 ) {
 	real Theta = DegToRad( VerticalFieldOfView );
-	real H     = tan( Theta / 2.0 );
+	real H     = tan     ( Theta     /     2.0 );
 
-	real ViewportHeight = 2.0 * H;
+	real ViewportHeight = 2.0         * H             ;
 	real ViewportWidth  = AspectRatio * ViewportHeight;
 
-	v3 LookVector  = Sub( Target, Position );
-	real FocusDist = Length( LookVector );
+	v3   LookVector = Sub   ( Target    , Position );
+	real FocusDist  = Length( LookVector           );
 
 	// Normals
 	v3 Forward = DivS     (        LookVector, FocusDist     );
 	v3 Right   = Normalise( Cross( Forward   , WorldUp     ) );
 	v3 Up      =            Cross( Right     , Forward     )  ;
 
-	v3 Width   = MulS( Right  , FocusDist * ViewportWidth  );
-	v3 Height  = MulS( Up     , FocusDist * ViewportHeight );
+	v3 Width   = MulS( Right, FocusDist * ViewportWidth  );
+	v3 Height  = MulS( Up   , FocusDist * ViewportHeight );
 
 	// Top Left = Position - Half Focus Width + Half Focus Height + Focus Forward
 	v3 TopLeft = Position;
-	   TopLeft = Sub( TopLeft, DivS( Width  , 2.0         ) );
-	   TopLeft = Add( TopLeft, DivS( Height , 2.0         ) );
-	   TopLeft = Add( TopLeft, MulS( Forward, FocusDist   ) );
+	   TopLeft = Sub( TopLeft, DivS( Width  , 2.0       ) );
+	   TopLeft = Add( TopLeft, DivS( Height , 2.0       ) );
+	   TopLeft = Add( TopLeft, MulS( Forward, FocusDist ) );
 
 	return (camera) {
 		.Pos        = Position,
@@ -486,8 +466,8 @@ CameraRay (
 	real   U,
 	real   V
 ) {
-	v3 rd = MulS( RandomInUnitDisc(), Cam.LensRadius );
-	v3 Offset = Add( MulS( Cam.Right, rd.X ), MulS( Cam.Up, rd.Y ) );
+	v3 rd     = MulS( RandomInUnitDisc()     ,       Cam.LensRadius );
+	v3 Offset = Add ( MulS( Cam.Right, rd.X ), MulS( Cam.Up, rd.Y ) );
 	// Direction = Top Left + U * Width - V * Height - Origin - Offset
 	v3 Pos = Add( Cam.Pos, Offset );
 	v3 Dir = Cam.TopLeft;
@@ -500,13 +480,8 @@ CameraRay (
 
 
 
-struct image_buffer {
-	// NOTE: Always 4 bytes in RR GG BB AA order
-	void* Buffer;
-	int   Width;
-	int   Height;
-	int   Pitch;
-} typedef image_buffer;
+// NOTE: Always 4 bytes in RR GG BB AA order
+struct image_buffer { rgba8* Buffer; int Width, Height, Pitch; } typedef image_buffer;
 
 
 
@@ -541,13 +516,11 @@ RenderWorld (
 
 			for ( int sx = 0; sx < Samples; ++sx )
 			for ( int sy = 0; sy < Samples; ++sy ) {
-				real su = (real) sx / Samples;
-				real sv = (real) sy / Samples;
-
-				real u = ( x + su ) / ( Image.Width  - 1 );
-				real v = ( y + sv ) / ( Image.Height - 1 );
-
-				ray  r = CameraRay( Cam, u, v );
+				real su = (real) sx   /   Samples;
+				real sv = (real) sy   /   Samples;
+				real  u = ( x +  su ) / ( Image.Width  - 1 );
+				real  v = ( y +  sv ) / ( Image.Height - 1 );
+				ray   r = CameraRay( Cam, u, v );
 
 				PixelColour = Add( PixelColour, RayColour( r, World, MaxDepth ) );
 			}
@@ -555,9 +528,9 @@ RenderWorld (
 			PixelColour = DivS( PixelColour, Samples * Samples );
 			PixelColour = Sqrt( PixelColour );
 
-			u1 Red   = (u1) ( 255.999 * CLAMP01( PixelColour.R ) );
-			u1 Green = (u1) ( 255.999 * CLAMP01( PixelColour.G ) );
-			u1 Blue  = (u1) ( 255.999 * CLAMP01( PixelColour.B ) );
+			u1 Red   = (u1) ( 255.999 * CLAMP_01( PixelColour.R ) );
+			u1 Green = (u1) ( 255.999 * CLAMP_01( PixelColour.G ) );
+			u1 Blue  = (u1) ( 255.999 * CLAMP_01( PixelColour.B ) );
 			u1 Alpha = UCHAR_MAX;
 			*Pixel   = Red   << 0
 			         | Green << 8
@@ -579,9 +552,9 @@ main (
 
 	TIMER_INIT();
 
-	#define WIDTH  256
-	#define HEIGHT 144
-	#define RGBA 4
+	#define WIDTH  256 * 2
+	#define HEIGHT 144 * 2
+	#define RGBA     4
 
 	image_buffer Image = {
 		.Buffer = malloc( WIDTH * HEIGHT * RGBA ),

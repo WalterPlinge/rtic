@@ -154,7 +154,7 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 enum material_type { Lambertian, Metal, Dielectric } typedef material_type;
 
-struct material { material_type Type; colour Albedo; real Roughness; real RefractiveIndex; } typedef material;
+struct material { material_type Type; colour Albedo; union { real Roughness, RefractiveIndex; }; } typedef material;
 
 
 

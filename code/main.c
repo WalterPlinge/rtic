@@ -298,10 +298,10 @@ AWholeNewWorld (
 	};
 
 #if 0
-	material GroundMat = { .Albedo = { 0.8, 0.8, 0.0 }, .Type = Lambertian };
-	material CenterMat = { .Albedo = { 0.1, 0.2, 0.5 }, .Type = Lambertian };
-	material LeftMat   = { .Type = Dielectric, .RefractiveIndex = 1.5 };
-	material RightMat  = { .Albedo = { 0.8, 0.6, 0.2 }, .Type = Metal, .Roughness = 0.0 };
+	material GroundMat = { .Type = Lambertian, .Albedo = { 0.8, 0.8, 0.0 },                        };
+	material CenterMat = { .Type = Lambertian, .Albedo = { 0.1, 0.2, 0.5 },                        };
+	material LeftMat   = { .Type = Dielectric,                              .RefractiveIndex = 1.5 };
+	material RightMat  = { .Type = Metal     , .Albedo = { 0.8, 0.6, 0.2 }, .Roughness       = 0.0 };
 
 	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius =  100.0  };
 	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =    0.5  };

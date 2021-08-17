@@ -27,8 +27,8 @@
 
 #define BETWEEN( x, a, b ) ( (a) < (x) and (x) < (b) )
 
-#define CLAMP(   x, a, b ) min( max( (x), (a) ), (b) )
-#define CLAMP_01( x )         CLAMP( (x),  0,     1  )
+#define CLAMP(    x, a, b ) min( max( (x), (a) ), (b) )
+#define CLAMP_01( x )     CLAMP(      (x),  0,     1  )
 
 
 

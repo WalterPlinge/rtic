@@ -47,16 +47,16 @@ uint_least32_t typedef u4;
 uint_least16_t typedef u2;
 uint_least8_t  typedef u1;
 
-u1       typedef byte;
+double         typedef f8; // 8 bytes
+float          typedef f4; // 4 bytes
+double         typedef f2; // double precision
+float          typedef f1; // single precision
 
-double   typedef f8; // 8 bytes
-float    typedef f4; // 4 bytes
-double   typedef f2; // double precision
-float    typedef f1; // single precision
+u1             typedef byte;
 
-f2       typedef real; // easy to swap precision
+u4             typedef rgba8;
 
-u4       typedef rgba8;
+f2             typedef real; // easy to swap precision
 
 
 

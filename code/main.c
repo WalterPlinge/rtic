@@ -1,9 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
+#define _UNICODE
 #include <iso646.h>
 #include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <tgmath.h>
 #include <time.h>
 
@@ -52,11 +54,11 @@ float          typedef f4; // 4 bytes
 double         typedef f2; // double precision
 float          typedef f1; // single precision
 
+unsigned int   typedef uint;
+f2             typedef real; // easy to swap precision
 u1             typedef byte;
 
 u4             typedef rgba8;
-
-f2             typedef real; // easy to swap precision
 
 
 
@@ -490,7 +492,9 @@ struct image_buffer { rgba8* Buffer; int Width, Height, Pitch; } typedef image_b
 internal void
 RenderWorld (
 	image_buffer Image,
-	world        World
+	world        World,
+	int         Samples,
+	int         Depth
 ) {
 	v3     Position   = { 13.0, -3.0, 2.0 };
 	v3     Target     = {  0.0,  0.0, 0.0 };
@@ -500,16 +504,13 @@ RenderWorld (
 	real   Aperture   = 0.2;
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
-	int Samples  = 1 << 1;
-	int MaxDepth = 1 << 3;
-
 	int y;
 	#pragma omp parallel for
 	for ( y = 0; y < Image.Height; y += 1 ) {
 		persistent int Complete = 0;
 		printf_s( "\rProgress: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
 
-		rgba8* Row  = (u4*) ( (byte*) Image.Buffer + y * Image.Pitch );
+		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
 
 		for ( int x = 0; x < Image.Width; x += 1 ) {
 			rgba8* Pixel = Row + x;
@@ -524,7 +525,7 @@ RenderWorld (
 				real  v = ( y +  sv ) / ( Image.Height - 1 );
 				ray   r = CameraRay( Cam, u, v );
 
-				PixelColour = Add( PixelColour, RayColour( r, World, MaxDepth ) );
+				PixelColour = Add( PixelColour, RayColour( r, World, Depth ) );
 			}
 
 			PixelColour = DivS( PixelColour, Samples * Samples );
@@ -545,6 +546,63 @@ RenderWorld (
 
 
 
+struct config { int Width, Height, Samples, Depth; } typedef config;
+
+internal config
+ParseArgs (
+	int    argc,
+	char** argv
+) {
+	persistent char* HelpMessage =
+		"Usage: rtic [options]                                  \n"
+		"    -?           - print this help message.            \n"
+		"    -w [width]   - set image width.       default: 256 \n"
+		"    -h [height]  - set image height.      default: 144 \n"
+		"    -s [samples] - set samples per pixel. default:   2 \n"
+		"    -d [depth]   - set max bounce depth.  default:  16 \n";
+
+	/* strtof, strncmp */
+
+	config Config = {
+		.Width   = 256,
+		.Height  = 144,
+		.Samples = 2,
+		.Depth   = 16,
+	};
+
+// #ifdef _WIN32
+// 	wchar_t** wargv = CommandLineToArgvW( GetCommandLineW(), NULL );
+// #endif
+
+	bool Help = false;
+	for ( int a = 1; a < argc; ++a ) {
+		char* arg = argv[a];
+
+		     if ( not strcmp( arg, "-w" ) and a < argc - 1 ) { Config.Width   = atoi( argv[++a] ); }
+		else if ( not strcmp( arg, "-h" ) and a < argc - 1 ) { Config.Height  = atoi( argv[++a] ); }
+		else if ( not strcmp( arg, "-s" ) and a < argc - 1 ) { Config.Samples = atoi( argv[++a] ); }
+		else if ( not strcmp( arg, "-d" ) and a < argc - 1 ) { Config.Depth   = atoi( argv[++a] ); }
+		else {
+			Help = true;
+			break;
+		}
+	}
+
+	if ( Config.Width <= 0 or Config.Height <= 0 or Config.Samples <= 0 or Config.Depth <= 0 ) {
+		Help = true;
+		printf_s( "Invalid parameter values recieved\n" );
+	}
+
+	if ( Help ) {
+		printf_s( HelpMessage );
+		exit( 0 );
+	}
+
+	return Config;
+}
+
+
+
 int
 main (
 	int    argc,
@@ -556,22 +614,21 @@ main (
 
 	TIMER_INIT();
 
-	#define WIDTH  256 * 2
-	#define HEIGHT 144 * 2
-	#define RGBA     4
+	config Config = ParseArgs( argc, argv );
+	printf_s( "Width   % 10u\nHeight  % 10u\nSamples % 10u\nDepth   % 10u\n", Config.Width, Config.Height, Config.Samples, Config.Depth );
 
 	image_buffer Image = {
-		.Buffer = malloc( WIDTH * HEIGHT * RGBA ),
-		.Width  = WIDTH,
-		.Height = HEIGHT,
-		.Pitch  = WIDTH * RGBA
+		.Buffer = malloc( Config.Width * Config.Height * sizeof( rgba8 ) ),
+		.Width  = Config.Width,
+		.Height = Config.Height,
+		.Pitch  = Config.Width * sizeof( rgba8 ),
 	};
 
 	world World = AWholeNewWorld();
 
-	TIMER_STAMP( "INIT  " );
+	TIMER_STAMP( "LOAD  " );
 
-	RenderWorld( Image, World );
+	RenderWorld( Image, World, Config.Samples, Config.Depth );
 
 	TIMER_STAMP( "RENDER" );
 
@@ -583,7 +640,7 @@ main (
 		stbi_write_png(
 			Filename,
 			Image.Width, Image.Height,
-			RGBA,
+			sizeof( rgba8 ),
 			Image.Buffer,
 			Image.Pitch );
 	}

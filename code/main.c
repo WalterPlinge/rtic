@@ -576,7 +576,7 @@ ParseArgs (
 	int    argc,
 	char** argv
 ) {
-	persistent char* HelpMessage =
+	char* HelpMessage =
 		"Usage: rtic [options]                                  \n"
 		"    -?           - print this help message.            \n"
 		"    -w [width]   - set image width.       default: 160 \n"
@@ -584,18 +584,12 @@ ParseArgs (
 		"    -s [samples] - set samples per pixel. default:   2 \n"
 		"    -d [depth]   - set max bounce depth.  default:  20 \n";
 
-	/* strtof, strncmp */
-
 	config Config = {
 		.Width   = 160,
 		.Height  = 90,
 		.Samples = 2,
 		.Depth   = 20,
 	};
-
-// #ifdef _WIN32
-// 	wchar_t** wargv = CommandLineToArgvW( GetCommandLineW(), NULL );
-// #endif
 
 	bool Help = false;
 	for ( int a = 1; a < argc; ++a ) {

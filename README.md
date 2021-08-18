@@ -7,3 +7,4 @@ ray tracer in c
 - multi-sampling (naive sampling tbh)
 - openmp multithreading
 - png output
+- command line config (set width, height, samples, depth)

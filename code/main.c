@@ -579,18 +579,18 @@ ParseArgs (
 	persistent char* HelpMessage =
 		"Usage: rtic [options]                                  \n"
 		"    -?           - print this help message.            \n"
-		"    -w [width]   - set image width.       default: 256 \n"
-		"    -h [height]  - set image height.      default: 144 \n"
+		"    -w [width]   - set image width.       default: 160 \n"
+		"    -h [height]  - set image height.      default:  90 \n"
 		"    -s [samples] - set samples per pixel. default:   2 \n"
-		"    -d [depth]   - set max bounce depth.  default:  16 \n";
+		"    -d [depth]   - set max bounce depth.  default:  20 \n";
 
 	/* strtof, strncmp */
 
 	config Config = {
-		.Width   = 256,
-		.Height  = 144,
+		.Width   = 160,
+		.Height  = 90,
 		.Samples = 2,
-		.Depth   = 16,
+		.Depth   = 20,
 	};
 
 // #ifdef _WIN32

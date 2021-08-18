@@ -385,6 +385,29 @@ RayColour (
 	persistent real Near = 0.0001;
 	persistent real Far  = 1000.0;
 
+	colour Colour = { 1.0, 1.0, 1.0 };
+
+	for ( int d = 0; d < Depth; ++d ) {
+		hit_info Info = { 0 };
+		if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
+			persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
+			persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
+			real T = ( Ray.Dir.Z + 1.0 ) / 2.0;
+			Colour = Mul( Colour, Lerp( Sky1, Sky2, T ) );
+			break;
+		}
+
+		colour Attenuation;
+		if ( not Scatter( Ray, Info, &Attenuation, &Ray ) ) {
+			Colour = MulS( Colour, 0.0 );
+			break;
+		}
+
+		Colour = Mul( Colour, Attenuation );
+	}
+
+	return Colour;
+#if 0
 	if ( Depth <= 0 ) {
 		return (colour) { 0.0, 0.0, 0.0 };
 	}
@@ -414,6 +437,7 @@ RayColour (
 	}
 
 	return Mul( Attenuation, RayColour( Scattered, World, Depth - 1 ) );
+#endif
 }
 
 

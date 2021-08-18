@@ -507,11 +507,7 @@ RenderWorld (
 	int y;
 	#pragma omp parallel for
 	for ( y = 0; y < Image.Height; y += 1 ) {
-		persistent int Complete = 0;
-		printf_s( "\rProgress: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
-
 		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
-
 		for ( int x = 0; x < Image.Width; x += 1 ) {
 			rgba8* Pixel = Row + x;
 
@@ -540,8 +536,11 @@ RenderWorld (
 			         | Blue  << 16
 			         | Alpha << 24;
 		}
+
+		persistent int Complete = 0;
+		printf_s( "\rPROGRESS: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
 	}
-	puts( "\rProgress: DONE" );
+	puts( "\rPROGRESS: DONE" );
 }
 
 
@@ -626,11 +625,11 @@ main (
 
 	world World = AWholeNewWorld();
 
-	TIMER_STAMP( "LOAD  " );
+	TIMER_STAMP( "LOAD    " );
 
 	RenderWorld( Image, World, Config.Samples, Config.Depth );
 
-	TIMER_STAMP( "RENDER" );
+	TIMER_STAMP( "RENDER  " );
 
 	{ // Save buffer to PNG file
 		byte Filename[ UCHAR_MAX ];
@@ -645,7 +644,7 @@ main (
 			Image.Pitch );
 	}
 
-	TIMER_STAMP( "SAVE  " );
+	TIMER_STAMP( "SAVE    " );
 
 
 	FreeTheWorld( World );

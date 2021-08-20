@@ -595,14 +595,12 @@ ParseArgs (
 	for ( int a = 1; a < argc; ++a ) {
 		char* arg = argv[a];
 
-		     if ( not strcmp( arg, "-w" ) and a < argc - 1 ) { Config.Width   = atoi( argv[++a] ); }
-		else if ( not strcmp( arg, "-h" ) and a < argc - 1 ) { Config.Height  = atoi( argv[++a] ); }
-		else if ( not strcmp( arg, "-s" ) and a < argc - 1 ) { Config.Samples = atoi( argv[++a] ); }
-		else if ( not strcmp( arg, "-d" ) and a < argc - 1 ) { Config.Depth   = atoi( argv[++a] ); }
-		else {
-			Help = true;
-			break;
-		}
+		     if ( strcmp( arg, "-?" ) or a >= argc - 1 ) { Help = true; break; }
+		else if ( strcmp( arg, "-w" ) == 0 ) { Config.Width   = atoi( argv[++a] ); }
+		else if ( strcmp( arg, "-h" ) == 0 ) { Config.Height  = atoi( argv[++a] ); }
+		else if ( strcmp( arg, "-s" ) == 0 ) { Config.Samples = atoi( argv[++a] ); }
+		else if ( strcmp( arg, "-d" ) == 0 ) { Config.Depth   = atoi( argv[++a] ); }
+		else { Help = true; break; }
 	}
 
 	if ( Config.Width <= 0 or Config.Height <= 0 or Config.Samples <= 0 or Config.Depth <= 0 ) {

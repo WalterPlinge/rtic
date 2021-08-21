@@ -15,6 +15,6 @@ pushd build
 
 call cl ../code/main.c %CompilerFlags% -link -libpath:../libs/ %LinkerFlags%
 
-if "%~1" == "-r" call main.exe
+if "%~1" == "-r" call %AppName%.exe
 
 popd

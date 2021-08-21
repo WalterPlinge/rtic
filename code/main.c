@@ -23,7 +23,8 @@
 
 
 
-#define PI 3.14159265358979323846
+#define EPS 1e-9
+#define PI  3.14159265358979323846
 
 
 
@@ -263,9 +264,48 @@ HitSphere (
 
 
 
-struct world { sphere* Spheres; material* SphereMaterials; } typedef world;
+struct plane { v3 Origin, Normal; } typedef plane;
 
-internal void FreeTheWorld ( world World ) { arrfree( World.Spheres ); arrfree( World.SphereMaterials ); }
+internal bool
+HitPlane (
+	ray       Ray,
+	plane     Plane,
+	real      Near,
+	real      Far,
+	hit_info* Info
+) {
+	real d = Dot( Plane.Normal, Ray.Dir );
+	if ( d == 0.0 ) {
+		return false;
+	}
+	real t = Dot( Sub( Plane.Origin, Ray.Pos ), Plane.Normal ) / d;
+	if ( not BETWEEN( t, Near, Far ) ) {
+		return false;
+	}
+	Info->Distance = t;
+	Info->Point    = PointOnRayAt( Ray, t );
+	SetFaceNormal( Info, Ray, Plane.Normal );
+	return true;
+}
+
+
+
+struct world {
+	sphere*   Spheres;
+	material* SphereMat;
+	plane*    Planes;
+	material* PlaneMat;
+} typedef world;
+
+internal void
+FreeTheWorld (
+	world World
+) {
+	arrfree( World.Spheres   );
+	arrfree( World.SphereMat );
+	arrfree( World.Planes    );
+	arrfree( World.PlaneMat  );
+}
 
 internal bool
 HitWorld (
@@ -283,7 +323,16 @@ HitWorld (
 		if ( HitSphere( Ray, World.Spheres[i], Near, Closest, &Tmp ) ) {
 			Hit          = true;
 			Closest      = Tmp.Distance;
-			Tmp.Material = World.SphereMaterials[i];
+			Tmp.Material = World.SphereMat[i];
+			*Info        = Tmp;
+		}
+	}
+
+	for ( int i = 0; i < arrlen( World.Planes ); ++i ) {
+		if ( HitPlane( Ray, World.Planes[i], Near, Closest, &Tmp ) ) {
+			Hit          = true;
+			Closest      = Tmp.Distance;
+			Tmp.Material = World.PlaneMat[i];
 			*Info        = Tmp;
 		}
 	}
@@ -293,11 +342,9 @@ HitWorld (
 
 internal world
 AWholeNewWorld (
+	bool Randomise
 ) {
-	world World = {
-		.Spheres         = NULL,
-		.SphereMaterials = NULL,
-	};
+	world World = { 0 };
 
 #if 0
 	material GroundMat = { .Type = Lambertian, .Albedo = { 0.8, 0.8, 0.0 },                        };
@@ -312,21 +359,22 @@ AWholeNewWorld (
 	sphere RightSphere  = { .Center = {  1.0, 1.0,    0.0 }, .Radius =    0.5  };
 
 	arrput( World.Spheres        , GroundSphere );
-	arrput( World.SphereMaterials, GroundMat    );
+	arrput( World.SphereMat, GroundMat    );
 	arrput( World.Spheres        , CenterSphere );
-	arrput( World.SphereMaterials, CenterMat    );
+	arrput( World.SphereMat, CenterMat    );
 	arrput( World.Spheres        , LeftSphere   );
-	arrput( World.SphereMaterials, LeftMat      );
+	arrput( World.SphereMat, LeftMat      );
 	arrput( World.Spheres        , LeftSphereIn );
-	arrput( World.SphereMaterials, LeftMat      );
+	arrput( World.SphereMat, LeftMat      );
 	arrput( World.Spheres        , RightSphere  );
-	arrput( World.SphereMaterials, RightMat     );
+	arrput( World.SphereMat, RightMat     );
 #else
-	sphere   GroundS = { .Center = { 0.0, 0.0, -1000.0 }, .Radius = 1000.0     };
-	material GroundM = { .Albedo = { 0.5, 0.5,     0.5 }, .Type   = Lambertian };
-	arrput( World.Spheres        , GroundS );
-	arrput( World.SphereMaterials, GroundM );
+	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = { 0.0, 0.0, 1.0 } };
+	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = Lambertian        };
+	arrput( World.Planes  , GroundP );
+	arrput( World.PlaneMat, GroundM );
 
+	if ( Randomise )
 	for ( int a = -11; a < 11; ++a )
 	for ( int b = -11; b < 11; ++b ) {
 		real ChooseMat = Random();
@@ -350,25 +398,25 @@ AWholeNewWorld (
 				Mat.RefractiveIndex = 1.5;
 			}
 
-			arrput( World.Spheres        , Sphere );
-			arrput( World.SphereMaterials, Mat    );
+			arrput( World.Spheres  , Sphere );
+			arrput( World.SphereMat, Mat    );
 		}
 	}
 
 	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius = 1.0 };
 	material Material1 = { .Type = Dielectric,  .RefractiveIndex = 1.5 };
-	arrput( World.Spheres        , Sphere1   );
-	arrput( World.SphereMaterials, Material1 );
+	arrput( World.Spheres  , Sphere1   );
+	arrput( World.SphereMat, Material1 );
 
 	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0        };
 	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = Lambertian };
-	arrput( World.Spheres        , Sphere2   );
-	arrput( World.SphereMaterials, Material2 );
+	arrput( World.Spheres  , Sphere2   );
+	arrput( World.SphereMat, Material2 );
 
 	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                };
 	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = Metal };
-	arrput( World.Spheres        , Sphere3   );
-	arrput( World.SphereMaterials, Material3 );
+	arrput( World.Spheres  , Sphere3   );
+	arrput( World.SphereMat, Material3 );
 #endif
 
 	return World;
@@ -595,7 +643,7 @@ ParseArgs (
 	for ( int a = 1; a < argc; ++a ) {
 		char* arg = argv[a];
 
-		     if ( strcmp( arg, "-?" ) or a >= argc - 1 ) { Help = true; break; }
+		     if ( strcmp( arg, "-?" ) == 0 or a >= argc - 1 ) { Help = true; break; }
 		else if ( strcmp( arg, "-w" ) == 0 ) { Config.Width   = atoi( argv[++a] ); }
 		else if ( strcmp( arg, "-h" ) == 0 ) { Config.Height  = atoi( argv[++a] ); }
 		else if ( strcmp( arg, "-s" ) == 0 ) { Config.Samples = atoi( argv[++a] ); }
@@ -639,7 +687,7 @@ main (
 		.Pitch  = Config.Width * sizeof( rgba8 ),
 	};
 
-	world World = AWholeNewWorld();
+	world World = AWholeNewWorld( true );
 
 	TIMER_STAMP( "LOAD    " );
 

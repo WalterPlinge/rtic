@@ -2,8 +2,8 @@
 # Values can have any number of whitespace characters between them
 
 # Primitives:
-# plane  X Y Z  NX NY NZ
 # sphere X Y Z  R
+# plane  X Y Z  NX NY NZ
 
 # Materials:
 # lambertian R G B

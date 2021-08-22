@@ -405,7 +405,7 @@ LoadWorldFile (
 	FILE*  File,
 	world* World
 ) {
-	enum primitive { PRIM_NONE, PRIM_PLANE, PRIM_SPHERE, PRIM_COUNT } typedef primitive;
+	enum primitive { PRIM_NONE, PRIM_SPHERE, PRIM_PLANE, PRIM_COUNT } typedef primitive;
 	primitive MatPrimitive = 0;
 
 	FILE* F  = File;
@@ -420,19 +420,6 @@ LoadWorldFile (
 			while ( C != '\n' and C != EOF ) C = fgetc( F );
 		}
 
-		else if ( strcmp( "plane", Buffer ) == 0 ) {
-			plane Plane = {0};
-			Scan = fscanf_s( F, "%lf %lf %lf %lf %lf %lf",
-				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
-				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
-			if ( Scan != 6 ) {
-				printf_s( "Could not read values for 'plane'\n" );
-				return false;
-			}
-			arrput( World->Planes, Plane );
-			MatPrimitive = PRIM_PLANE;
-		}
-
 		else if ( strcmp( "sphere", Buffer ) == 0 ) {
 			sphere Sphere = {0};
 			Scan = fscanf_s( F, "%lf %lf %lf %lf",
@@ -444,6 +431,19 @@ LoadWorldFile (
 			}
 			arrput( World->Spheres, Sphere );
 			MatPrimitive = PRIM_SPHERE;
+		}
+
+		else if ( strcmp( "plane", Buffer ) == 0 ) {
+			plane Plane = {0};
+			Scan = fscanf_s( F, "%lf %lf %lf %lf %lf %lf",
+				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
+				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
+			if ( Scan != 6 ) {
+				printf_s( "Could not read values for 'plane'\n" );
+				return false;
+			}
+			arrput( World->Planes, Plane );
+			MatPrimitive = PRIM_PLANE;
 		}
 
 		else if ( strcmp( "lambertian", Buffer ) == 0 ) {

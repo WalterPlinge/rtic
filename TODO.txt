@@ -2,4 +2,22 @@
 ? INFO
 * DONE
 
+! primitives
+	* planes
+	* spheres
+	! triangles
+	! quads
+	! cuboids
+	! spheroids
+! materials
+	* lambertian
+	* metal
+	* dielectric
+	! emissive
+	! textures
+! read settings from file
+	* world (primitives and materials)
+	! camera settings
+	! sky colours
+
 * BUG: sky noise for some reason (was due to race condition from openmp on sample loops)

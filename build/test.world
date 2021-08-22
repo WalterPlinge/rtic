@@ -1,0 +1,22 @@
+# Comments start with a '# ' (including the space)
+# Values can have any number of whitespace characters between them
+
+# Primitives:
+# plane  X Y Z  NX NY NZ
+# sphere X Y Z  R
+
+# Materials:
+# lambertian R G B
+# metal      R G B   V
+# dielectric         V
+
+# Material V values:
+	# metal      = 'roughness' value
+	# dielectric = 'refractive index' value
+
+plane     0.0  0.0 0.0   0.0 0.0 1.0   lambertian   0.5 0.5 0.5
+sphere    0.0  0.0 1.0   1.0           dielectric                  1.5
+sphere   -4.0 -1.0 1.0   1.0           lambertian   0.4 0.2 0.1
+sphere    4.0  1.0 1.0   1.0           metal        0.7 0.6 0.5    0.0
+sphere    1.0 -4.0 1.0   1.0           metal        0.1 0.4 0.2    0.2
+sphere   -1.0  4.0 1.0   1.0           lambertian   0.2 0.1 0.4

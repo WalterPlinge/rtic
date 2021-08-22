@@ -155,7 +155,7 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 
 
-enum material_type { Lambertian, Metal, Dielectric } typedef material_type;
+enum material_type { MAT_LAMBERTIAN, MAT_METAL, MAT_DIELECTRIC } typedef material_type;
 
 struct material { material_type Type; colour Albedo; union { real Roughness, RefractiveIndex; }; } typedef material;
 
@@ -185,7 +185,7 @@ Scatter (
 	ray*     Scattered
 ) {
 	switch ( Info.Material.Type ) {
-		case Lambertian: {
+		case MAT_LAMBERTIAN: {
 			v3 Dir = Add( Info.Normal, RandomUnitVector() );
 			while ( NearZero( Dir ) ) { // HACK: infinite loop
 				Dir = Add( Info.Normal, RandomUnitVector() );
@@ -195,7 +195,7 @@ Scatter (
 			return true;
 		} break;
 
-		case Metal: {
+		case MAT_METAL: {
 			v3 Reflected = Reflect( Ray.Dir, Info.Normal );
 			v3 Direction = Add( Reflected, MulS( RandomInUnitSphere(), Info.Material.Roughness ) );
 			*Scattered   = NewRay( Info.Point, Direction );
@@ -203,7 +203,7 @@ Scatter (
 			return Dot( Scattered->Dir, Info.Normal ) > 0.0;
 		} break;
 
-		case Dielectric: {
+		case MAT_DIELECTRIC: {
 			*Attenuation      = (colour) { 1.0, 1.0, 1.0 };
 			real RefractRatio = Info.FrontFace
 				? ( 1.0 / Info.Material.RefractiveIndex )
@@ -315,7 +315,7 @@ HitWorld (
 	real      Far,
 	hit_info* Info
 ) {
-	hit_info Tmp = { 0 };
+	hit_info Tmp = {0};
 	bool     Hit = false;
 	real Closest = Far;
 
@@ -344,10 +344,10 @@ internal world
 AWholeNewWorld (
 	bool Randomise
 ) {
-	world World = { 0 };
+	world World = {0};
 
 	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = { 0.0, 0.0, 1.0 } };
-	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = Lambertian        };
+	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_LAMBERTIAN    };
 	arrput( World.Planes  , GroundP );
 	arrput( World.PlaneMat, GroundM );
 
@@ -364,14 +364,14 @@ AWholeNewWorld (
 
 		if ( Length( Sub( Sphere.Center, (v3) { 4.0, 0.0, 0.2 } ) ) > 0.9 ) {
 			if ( ChooseMat < 0.8 ) {
-				Mat.Type   = Lambertian;
+				Mat.Type   = MAT_LAMBERTIAN;
 				Mat.Albedo = Mul( RandomV(), RandomV() );
 			} else if ( ChooseMat < 0.95 ) {
-				Mat.Type      = Metal;
+				Mat.Type      = MAT_METAL;
 				Mat.Albedo    = RandomRangeV( 0.5, 1.0 );
 				Mat.Roughness = RandomRange ( 0.0, 0.5 );
 			} else {
-				Mat.Type            = Dielectric;
+				Mat.Type            = MAT_DIELECTRIC;
 				Mat.RefractiveIndex = 1.5;
 			}
 
@@ -380,22 +380,123 @@ AWholeNewWorld (
 		}
 	}
 
-	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius = 1.0 };
-	material Material1 = { .Type = Dielectric,  .RefractiveIndex = 1.5 };
+	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius          = 1.0 };
+	material Material1 = { .Type   = MAT_DIELECTRIC    , .RefractiveIndex = 1.5 };
 	arrput( World.Spheres  , Sphere1   );
 	arrput( World.SphereMat, Material1 );
 
-	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0        };
-	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = Lambertian };
+	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0            };
+	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = MAT_LAMBERTIAN };
 	arrput( World.Spheres  , Sphere2   );
 	arrput( World.SphereMat, Material2 );
 
-	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                };
-	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = Metal };
+	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                    };
+	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = MAT_METAL };
 	arrput( World.Spheres  , Sphere3   );
 	arrput( World.SphereMat, Material3 );
 
 	return World;
+}
+
+
+
+internal bool
+LoadWorldFile (
+	FILE*  File,
+	world* World
+) {
+	enum primitive { PRIM_NONE, PRIM_PLANE, PRIM_SPHERE, PRIM_COUNT } typedef primitive;
+	primitive MatPrimitive = 0;
+
+	FILE* F  = File;
+	int Scan = 1;
+	char Buffer[UCHAR_MAX] = {0};
+
+	while ( Scan != EOF ) {
+		Scan = fscanf_s( F, "%s", Buffer, (uint) sizeof( Buffer ) - 1 );
+		if ( Scan == EOF ) break;
+		if ( strcmp( "#", Buffer ) == 0 ) {
+			char C = 0;
+			while ( C != '\n' and C != EOF ) C = fgetc( F );
+		}
+
+		else if ( strcmp( "plane", Buffer ) == 0 ) {
+			plane Plane = {0};
+			Scan = fscanf_s( F, "%lf %lf %lf %lf %lf %lf",
+				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
+				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
+			if ( Scan != 6 ) {
+				printf_s( "Could not read values for 'plane'\n" );
+				return false;
+			}
+			arrput( World->Planes, Plane );
+			MatPrimitive = PRIM_PLANE;
+		}
+
+		else if ( strcmp( "sphere", Buffer ) == 0 ) {
+			sphere Sphere = {0};
+			Scan = fscanf_s( F, "%lf %lf %lf %lf",
+				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
+				&Sphere.Radius );
+			if ( Scan != 4 ) {
+				printf_s( "Could not read values for 'sphere'\n" );
+				return false;
+			}
+			arrput( World->Spheres, Sphere );
+			MatPrimitive = PRIM_SPHERE;
+		}
+
+		else if ( strcmp( "lambertian", Buffer ) == 0 ) {
+			material Mat = { .Type = MAT_LAMBERTIAN };
+			Scan = fscanf_s( F, "%lf %lf %lf",
+				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
+			if ( Scan != 3 ) {
+				printf_s( "Could not read values for 'lambertian'\n" );
+				return false;
+			}
+			if ( MatPrimitive == PRIM_PLANE ) {
+				arrput( World->PlaneMat, Mat );
+			} else if ( MatPrimitive == PRIM_SPHERE ) {
+				arrput( World->SphereMat, Mat );
+			}
+			MatPrimitive = PRIM_NONE;
+		}
+
+		else if ( strcmp( "metal", Buffer ) == 0 ) {
+			material Mat = { .Type = MAT_METAL };
+			Scan = fscanf_s( F, "%lf %lf %lf %lf",
+				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
+				&Mat.Roughness );
+			if ( Scan != 4 ) {
+				printf_s( "Could not read values for 'metal'\n" );
+				return false;
+			}
+			if ( MatPrimitive == PRIM_PLANE ) {
+				arrput( World->PlaneMat, Mat );
+			} else if ( MatPrimitive == PRIM_SPHERE ) {
+				arrput( World->SphereMat, Mat );
+			}
+			MatPrimitive = PRIM_NONE;
+		}
+
+		else if ( strcmp( "dielectric", Buffer ) == 0 ) {
+			material Mat = { .Type = MAT_DIELECTRIC };
+			Scan = fscanf_s( F, "%lf",
+				&Mat.RefractiveIndex );
+			if ( Scan != 1 ) {
+				printf_s( "Could not read values for 'dielectric'\n" );
+				return false;
+			}
+			if ( MatPrimitive == PRIM_PLANE ) {
+				arrput( World->PlaneMat, Mat );
+			} else if ( MatPrimitive == PRIM_SPHERE ) {
+				arrput( World->SphereMat, Mat );
+			}
+			MatPrimitive = PRIM_NONE;
+		}
+	}
+
+	return true;
 }
 
 
@@ -412,7 +513,7 @@ RayColour (
 	colour Colour = { 1.0, 1.0, 1.0 };
 
 	for ( int d = 0; d < Depth; ++d ) {
-		hit_info Info = { 0 };
+		hit_info Info = {0};
 		if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
 			persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
 			persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
@@ -521,14 +622,14 @@ RenderWorld (
 	real   Aperture   = 0.2;
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
-	int y;
+	int y = 0;
 	#pragma omp parallel for
 	for ( y = 0; y < Image.Height; y += 1 ) {
 		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
 		for ( int x = 0; x < Image.Width; x += 1 ) {
 			rgba8* Pixel = Row + x;
 
-			colour PixelColour = { 0 };
+			colour PixelColour = {0};
 
 			for ( int sx = 0; sx < Samples; ++sx )
 			for ( int sy = 0; sy < Samples; ++sy ) {
@@ -562,7 +663,7 @@ RenderWorld (
 
 
 
-struct config { int Width, Height, Samples, Depth; } typedef config;
+struct config { bool Error; int Width, Height, Samples, Depth; char* WorldFile; } typedef config;
 
 internal config
 ParseArgs (
@@ -570,29 +671,33 @@ ParseArgs (
 	char** argv
 ) {
 	char* HelpMessage =
-		"Usage: rtic [options]                                  \n"
-		"    -?           - print this help message.            \n"
-		"    -w [width]   - set image width.       default: 160 \n"
-		"    -h [height]  - set image height.      default:  90 \n"
-		"    -s [samples] - set samples per pixel. default:   2 \n"
-		"    -d [depth]   - set max bounce depth.  default:  20 \n";
+		"Usage: rtic [options]                                   \n"
+		"    -?           - print this help message.             \n"
+		"    -w [width]   - set image width.       default:  160 \n"
+		"    -h [height]  - set image height.      default:   90 \n"
+		"    -s [samples] - set samples per pixel. default:    2 \n"
+		"    -d [depth]   - set max bounce depth.  default:   20 \n"
+		"    -f [file]    - load world from file.  default: none \n";
 
 	config Config = {
-		.Width   = 160,
-		.Height  = 90,
-		.Samples = 2,
-		.Depth   = 20,
+		.Error     = false,
+		.Width     = 160,
+		.Height    = 90,
+		.Samples   = 2,
+		.Depth     = 20,
+		.WorldFile = NULL,
 	};
 
 	bool Help = false;
 	for ( int a = 1; a < argc; ++a ) {
 		char* arg = argv[a];
 
-		     if ( strcmp( arg, "-?" ) == 0 or a >= argc - 1 ) { Help = true; break; }
-		else if ( strcmp( arg, "-w" ) == 0 ) { Config.Width   = atoi( argv[++a] ); }
-		else if ( strcmp( arg, "-h" ) == 0 ) { Config.Height  = atoi( argv[++a] ); }
-		else if ( strcmp( arg, "-s" ) == 0 ) { Config.Samples = atoi( argv[++a] ); }
-		else if ( strcmp( arg, "-d" ) == 0 ) { Config.Depth   = atoi( argv[++a] ); }
+		     if ( strcmp( "-?", arg ) == 0 or a >= argc - 1 ) { Help  = true; break; }
+		else if ( strcmp( "-w", arg ) == 0 ) { Config.Width     = atoi( argv[++a] ); }
+		else if ( strcmp( "-h", arg ) == 0 ) { Config.Height    = atoi( argv[++a] ); }
+		else if ( strcmp( "-s", arg ) == 0 ) { Config.Samples   = atoi( argv[++a] ); }
+		else if ( strcmp( "-d", arg ) == 0 ) { Config.Depth     = atoi( argv[++a] ); }
+		else if ( strcmp( "-f", arg ) == 0 ) { Config.WorldFile =       argv[++a]  ; }
 		else { Help = true; break; }
 	}
 
@@ -603,7 +708,7 @@ ParseArgs (
 
 	if ( Help ) {
 		printf_s( HelpMessage );
-		exit( 0 );
+		Config.Error = true;
 	}
 
 	return Config;
@@ -616,14 +721,39 @@ main (
 	int    argc,
 	char** argv
 ) {
+	config Config = ParseArgs( argc, argv );
+	if ( Config.Error ) return;
+
+	printf_s( "Width      = % 10u\n", Config.Width   );
+	printf_s( "Height     = % 10u\n", Config.Height  );
+	printf_s( "Samples    = % 10u\n", Config.Samples );
+	printf_s( "Depth      = % 10u\n", Config.Depth   );
+	printf_s( "World File = % 10s\n", Config.WorldFile ? Config.WorldFile : "none" );
+	//return;
+
 	puts( "START" );
 
 	srand( 2 );
 
 	TIMER_INIT();
 
-	config Config = ParseArgs( argc, argv );
-	printf_s( "Width   % 10u\nHeight  % 10u\nSamples % 10u\nDepth   % 10u\n", Config.Width, Config.Height, Config.Samples, Config.Depth );
+	world World = {0};
+	if ( Config.WorldFile != NULL ) {
+		FILE* File = fopen( Config.WorldFile, "r" );
+		if ( not File ) {
+			printf_s( "Could not open file '%s'\n", Config.WorldFile );
+			return;
+		}
+		bool OK = LoadWorldFile( File, &World );
+		fclose( File );
+		if ( not OK ) {
+			printf_s( "Failed to load world from file '%s'", Config.WorldFile );
+			FreeTheWorld( World );
+			return;
+		}
+	} else {
+		//World = AWholeNewWorld( true );
+	}
 
 	image_buffer Image = {
 		.Buffer = malloc( Config.Width * Config.Height * sizeof( rgba8 ) ),
@@ -631,8 +761,6 @@ main (
 		.Height = Config.Height,
 		.Pitch  = Config.Width * sizeof( rgba8 ),
 	};
-
-	world World = AWholeNewWorld( true );
 
 	TIMER_STAMP( "LOAD    " );
 

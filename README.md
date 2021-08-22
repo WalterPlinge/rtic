@@ -8,3 +8,4 @@ ray tracer in c
 - openmp multithreading
 - png output
 - command line config (set width, height, samples, depth)
+- loads world info from file (see build/test.world)

@@ -415,7 +415,7 @@ LoadWorldFile (
 	while ( Scan != EOF ) {
 		Scan = fscanf_s( F, "%s", Buffer, (uint) sizeof( Buffer ) - 1 );
 		if ( Scan == EOF ) break;
-		if ( strcmp( "#", Buffer ) == 0 ) {
+		if ( Buffer[0] == '#' ) {
 			char C = 0;
 			while ( C != '\n' and C != EOF ) C = fgetc( F );
 		}

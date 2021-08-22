@@ -242,7 +242,7 @@ HitSphere (
 ) {
 	v3   p = Sub( Sphere.Center, Ray.Pos );
 	real m = Dot( Ray.Dir, p );
-	real c = Dot( p, p ) - Sphere.Radius * Sphere.Radius;
+	real c = Dot( p      , p ) - Sphere.Radius * Sphere.Radius;
 	real d = m * m - c;
 	if ( d < 0.0 ) {
 		return false;

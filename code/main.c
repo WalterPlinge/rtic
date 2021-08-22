@@ -512,7 +512,8 @@ RayColour (
 
 	colour Colour = { 1.0, 1.0, 1.0 };
 
-	for ( int d = 0; d < Depth; ++d ) {
+	int d;
+	for ( d = 0; d < Depth; ++d ) {
 		hit_info Info = {0};
 		if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
 			persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
@@ -529,6 +530,10 @@ RayColour (
 		}
 
 		Colour = Mul( Colour, Attenuation );
+	}
+
+	if ( d == Depth ) {
+		Colour = MulS( Colour, 0.0 );
 	}
 
 	return Colour;

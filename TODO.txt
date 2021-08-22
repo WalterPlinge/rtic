@@ -21,3 +21,5 @@
 	! sky colours
 
 * BUG: sky noise for some reason (was due to race condition from openmp on sample loops)
+? BUG: When bounce depth is reached, if colour is not set to 0, light seems to be 'added' to the world.
+	? is setting the colour to 0 the correct way to deal with this?

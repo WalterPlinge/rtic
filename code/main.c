@@ -757,7 +757,7 @@ main (
 			return;
 		}
 	} else {
-		//World = AWholeNewWorld( true );
+		World = AWholeNewWorld( true );
 	}
 
 	image_buffer Image = {

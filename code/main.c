@@ -346,29 +346,6 @@ AWholeNewWorld (
 ) {
 	world World = { 0 };
 
-#if 0
-	material GroundMat = { .Type = Lambertian, .Albedo = { 0.8, 0.8, 0.0 },                        };
-	material CenterMat = { .Type = Lambertian, .Albedo = { 0.1, 0.2, 0.5 },                        };
-	material LeftMat   = { .Type = Dielectric,                              .RefractiveIndex = 1.5 };
-	material RightMat  = { .Type = Metal     , .Albedo = { 0.8, 0.6, 0.2 }, .Roughness       = 0.0 };
-
-	sphere GroundSphere = { .Center = {  0.0, 1.0, -100.5 }, .Radius =  100.0  };
-	sphere CenterSphere = { .Center = {  0.0, 1.0,    0.0 }, .Radius =    0.5  };
-	sphere LeftSphere   = { .Center = { -1.0, 1.0,    0.0 }, .Radius =    0.5  };
-	sphere LeftSphereIn = { .Center = { -1.0, 1.0,    0.0 }, .Radius = -  0.45 };
-	sphere RightSphere  = { .Center = {  1.0, 1.0,    0.0 }, .Radius =    0.5  };
-
-	arrput( World.Spheres        , GroundSphere );
-	arrput( World.SphereMat, GroundMat    );
-	arrput( World.Spheres        , CenterSphere );
-	arrput( World.SphereMat, CenterMat    );
-	arrput( World.Spheres        , LeftSphere   );
-	arrput( World.SphereMat, LeftMat      );
-	arrput( World.Spheres        , LeftSphereIn );
-	arrput( World.SphereMat, LeftMat      );
-	arrput( World.Spheres        , RightSphere  );
-	arrput( World.SphereMat, RightMat     );
-#else
 	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = { 0.0, 0.0, 1.0 } };
 	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = Lambertian        };
 	arrput( World.Planes  , GroundP );
@@ -417,7 +394,6 @@ AWholeNewWorld (
 	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = Metal };
 	arrput( World.Spheres  , Sphere3   );
 	arrput( World.SphereMat, Material3 );
-#endif
 
 	return World;
 }
@@ -455,37 +431,6 @@ RayColour (
 	}
 
 	return Colour;
-#if 0
-	if ( Depth <= 0 ) {
-		return (colour) { 0.0, 0.0, 0.0 };
-	}
-
-	hit_info Info = { 0 };
-	if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
-		persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
-		persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
-		real T = ( Ray.Dir.Z + 1.0 ) / 2.0;
-		return Lerp( Sky1, Sky2, T );
-	}
-
-	// Render normals
-	//return DivS( AddS( Info.Normal, 1.0), 2.0 );
-
-	// Only lambertian diffuse
-	//v3 Target = Add( Info.Point, RandomInHemisphere( Info.Normal ) );        // Old papers
-	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomInUnitSphere() ); // Inaccurate lambertian
-	//v3 Target = Add( Add( Info.Point, Info.Normal ), RandomUnitVector() );
-	//v3 Dir    = Sub( Target, Info.Point );
-	//return DivS( RayColour( NewRay( Info.Point, Dir ), World, Depth - 1 ), 2.0 );
-
-	ray Scattered;
-	colour Attenuation;
-	if ( not Scatter( Ray, Info, &Attenuation, &Scattered ) ) {
-		return (colour) { 0.0, 0.0, 0.0 };
-	}
-
-	return Mul( Attenuation, RayColour( Scattered, World, Depth - 1 ) );
-#endif
 }
 
 

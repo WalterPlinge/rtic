@@ -88,7 +88,7 @@ ReflectanceSchlick (
 union v3 { real e[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
 v3 typedef colour;
 
-internal bool NearZero  ( v3   A                 ) { return A.X < 1e-9 and A.Y < 1e-9 and A.Z < 1e-9   ; }
+internal bool NearZero  ( v3   A                 ) { return A.X<EPS&&A.X>-EPS&&A.Y<EPS&&A.Y>-EPS&&A.Z<EPS&&A.Z>-EPS;}
 internal real Sum       ( v3   A                 ) { return         A.X +       A.Y +       A.Z        ; }
 internal v3   Negate    ( v3   A                 ) { return (v3) { -A.X      , -A.Y      , -A.Z       }; }
 internal v3   Add       ( v3   A, v3   B         ) { return (v3) {  A.X + B.X,  A.Y + B.Y,  A.Z + B.Z }; }

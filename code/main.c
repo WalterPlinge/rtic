@@ -88,7 +88,7 @@ ReflectanceSchlick (
 union v3 { real e[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
 v3 typedef colour;
 
-internal bool NearZero  ( v3   A                 ) { return A.X < 1e-9 and A.Y < 1e-9 and A.Z < 1e-9;    }
+internal bool NearZero  ( v3   A                 ) { return A.X < 1e-9 and A.Y < 1e-9 and A.Z < 1e-9   ; }
 internal real Sum       ( v3   A                 ) { return         A.X +       A.Y +       A.Z        ; }
 internal v3   Negate    ( v3   A                 ) { return (v3) { -A.X      , -A.Y      , -A.Z       }; }
 internal v3   Add       ( v3   A, v3   B         ) { return (v3) {  A.X + B.X,  A.Y + B.Y,  A.Z + B.Z }; }
@@ -100,10 +100,10 @@ internal v3   SubS      ( v3   A, real B         ) { return (v3) {  A.X - B  ,  
 internal v3   MulS      ( v3   A, real B         ) { return (v3) {  A.X * B  ,  A.Y * B  ,  A.Z * B   }; }
 internal v3   DivS      ( v3   A, real B         ) { return (v3) {  A.X / B  ,  A.Y / B  ,  A.Z / B   }; }
 internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
-internal real Dot       ( v3   A, v3   B         ) { return Sum( Mul( A, B ) ); }
+internal real Dot       ( v3   A, v3   B         ) { return         A.X * B.X + A.Y * B.Y + A.Z * B.Z  ; }
+internal real Length2   ( v3   A                 ) { return         A.X * A.X + A.Y * A.Y + A.Z * A.Z  ; }
+internal real Length    ( v3   A                 ) { return sqrt(   A.X * A.X + A.Y * A.Y + A.Z * A.Z ); }
 internal v3   Cross     ( v3   A, v3   B         ) { return (v3) { A.Y*B.Z-A.Z*B.Y, A.Z*B.X-A.X*B.Z, A.X*B.Y-A.Y*B.X }; }
-internal real Length2   ( v3   A                 ) { return Dot ( A,          A   ); }
-internal real Length    ( v3   A                 ) { return sqrt(    Length2( A ) ); }
 internal v3   Normalise ( v3   A                 ) { return DivS( A, Length ( A ) ); }
 internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add ( MulS( A, 1.0 - T ) , MulS( B, T )   ); }
 internal v3   Reflect   ( v3   A, v3   N         ) { return Sub ( A,    MulS( N, 2.0 * Dot ( A, N ) ) ); }

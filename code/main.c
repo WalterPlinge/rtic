@@ -2,12 +2,12 @@
 #define _UNICODE
 #include <iso646.h>
 #include <limits.h>
+#include <math.h>
 #include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <tgmath.h>
 #include <time.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION

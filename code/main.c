@@ -63,7 +63,7 @@ u4             typedef rgba8;
 
 
 
-internal real Random     (                    ) { return (real) rand() / ( (real) RAND_MAX + 1 ); }
+internal real Random     (                    ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
 internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random(  ); }
 
 
@@ -78,9 +78,11 @@ ReflectanceSchlick (
 	real Cosine,
 	real Index
 ) {
-	real r0 = ( 1 - Index ) / ( 1 + Index );
+	real r0 = ( 1.0 - Index ) / ( 1.0 + Index );
 	r0 = r0 * r0;
-	return r0 + ( 1 - r0 ) * pow( 1 - Cosine, 5 );
+	real c0 = 1.0 - Cosine;
+	c0 = c0 * c0 * c0 * c0 * c0; // pow( c0, 5 );
+	return r0 + ( 1.0 - r0 ) * c0;
 }
 
 

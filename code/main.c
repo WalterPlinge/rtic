@@ -36,7 +36,7 @@
 
 
 #define TIMER_INIT() clock_t _timer = clock();
-#define TIMER_STAMP(s) printf( s ": %.3fs\n", (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
+#define TIMER_STAMP( str ) printf( "%s: %.3fs\n", str, (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
 
 
 

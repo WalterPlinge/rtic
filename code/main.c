@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _UNICODE
 #include <iso646.h>
+#include <limits.h>
 #include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -10,7 +11,6 @@
 #include <time.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBIW_WINDOWS_UTF8
 #include "stb_image_write.h"
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
@@ -30,13 +30,13 @@
 
 #define BETWEEN( x, a, b ) ( (a) < (x) and (x) < (b) )
 
-#define CLAMP(    x, a, b ) min( max( (x), (a) ), (b) )
-#define CLAMP_01( x )     CLAMP(      (x),  0,     1  )
+#define CLAMP(    x, a, b ) fmin( fmax( (x), (a) ), (b) )
+#define CLAMP_01( x )      CLAMP(       (x),  0,     1  )
 
 
 
 #define TIMER_INIT() clock_t _timer = clock();
-#define TIMER_STAMP(s) printf_s( s ": %.3fs\n", (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
+#define TIMER_STAMP(s) printf( s ": %.3fs\n", (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
 
 
 
@@ -63,7 +63,7 @@ u4             typedef rgba8;
 
 
 
-internal real Random     (                    ) { return (real) rand() / ( RAND_MAX + 1 ); }
+internal real Random     (                    ) { return (real) rand() / ( (real) RAND_MAX + 1 ); }
 internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random(  ); }
 
 
@@ -413,7 +413,8 @@ LoadWorldFile (
 	char Buffer[UCHAR_MAX] = {0};
 
 	while ( Scan != EOF ) {
-		Scan = fscanf_s( F, "%s", Buffer, (uint) sizeof( Buffer ) - 1 );
+		// HACK: provide length in string, equal to `(uint) sizeof( Buffer ) - 1`
+		Scan = fscanf( F, "%254s", Buffer );
 		if ( Scan == EOF ) break;
 		if ( Buffer[0] == '#' ) {
 			char C = 0;
@@ -422,11 +423,11 @@ LoadWorldFile (
 
 		else if ( strcmp( "sphere", Buffer ) == 0 ) {
 			sphere Sphere = {0};
-			Scan = fscanf_s( F, "%lf %lf %lf %lf",
+			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
 				&Sphere.Radius );
 			if ( Scan != 4 ) {
-				printf_s( "Could not read values for 'sphere'\n" );
+				printf( "Could not read values for 'sphere'\n" );
 				return false;
 			}
 			arrput( World->Spheres, Sphere );
@@ -435,11 +436,11 @@ LoadWorldFile (
 
 		else if ( strcmp( "plane", Buffer ) == 0 ) {
 			plane Plane = {0};
-			Scan = fscanf_s( F, "%lf %lf %lf %lf %lf %lf",
+			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf",
 				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
 				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
 			if ( Scan != 6 ) {
-				printf_s( "Could not read values for 'plane'\n" );
+				printf( "Could not read values for 'plane'\n" );
 				return false;
 			}
 			arrput( World->Planes, Plane );
@@ -448,10 +449,10 @@ LoadWorldFile (
 
 		else if ( strcmp( "lambertian", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_LAMBERTIAN };
-			Scan = fscanf_s( F, "%lf %lf %lf",
+			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
 			if ( Scan != 3 ) {
-				printf_s( "Could not read values for 'lambertian'\n" );
+				printf( "Could not read values for 'lambertian'\n" );
 				return false;
 			}
 			if ( MatPrimitive == PRIM_PLANE ) {
@@ -464,11 +465,11 @@ LoadWorldFile (
 
 		else if ( strcmp( "metal", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_METAL };
-			Scan = fscanf_s( F, "%lf %lf %lf %lf",
+			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
 				&Mat.Roughness );
 			if ( Scan != 4 ) {
-				printf_s( "Could not read values for 'metal'\n" );
+				printf( "Could not read values for 'metal'\n" );
 				return false;
 			}
 			if ( MatPrimitive == PRIM_PLANE ) {
@@ -481,10 +482,10 @@ LoadWorldFile (
 
 		else if ( strcmp( "dielectric", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_DIELECTRIC };
-			Scan = fscanf_s( F, "%lf",
+			Scan = fscanf( F, "%lf",
 				&Mat.RefractiveIndex );
 			if ( Scan != 1 ) {
-				printf_s( "Could not read values for 'dielectric'\n" );
+				printf( "Could not read values for 'dielectric'\n" );
 				return false;
 			}
 			if ( MatPrimitive == PRIM_PLANE ) {
@@ -661,7 +662,7 @@ RenderWorld (
 		}
 
 		persistent int Complete = 0;
-		printf_s( "\rPROGRESS: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
+		printf( "\rPROGRESS: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
 	}
 	puts( "\rPROGRESS: DONE" );
 }
@@ -708,11 +709,11 @@ ParseArgs (
 
 	if ( Config.Width <= 0 or Config.Height <= 0 or Config.Samples <= 0 or Config.Depth <= 0 ) {
 		Help = true;
-		printf_s( "Invalid parameter values recieved\n" );
+		printf( "Invalid parameter values recieved\n" );
 	}
 
 	if ( Help ) {
-		printf_s( HelpMessage );
+		printf( "%s", HelpMessage );
 		Config.Error = true;
 	}
 
@@ -727,14 +728,14 @@ main (
 	char** argv
 ) {
 	config Config = ParseArgs( argc, argv );
-	if ( Config.Error ) return;
+	if ( Config.Error ) return( EXIT_FAILURE );
 
-	printf_s( "Width      = % 10u\n", Config.Width   );
-	printf_s( "Height     = % 10u\n", Config.Height  );
-	printf_s( "Samples    = % 10u\n", Config.Samples );
-	printf_s( "Depth      = % 10u\n", Config.Depth   );
-	printf_s( "World File = % 10s\n", Config.WorldFile ? Config.WorldFile : "none" );
-	//return;
+	// HACK: padding?
+	printf( "Width      = %10u\n", Config.Width   );
+	printf( "Height     = %10u\n", Config.Height  );
+	printf( "Samples    = %10u\n", Config.Samples );
+	printf( "Depth      = %10u\n", Config.Depth   );
+	printf( "World File = %10s\n", Config.WorldFile ? Config.WorldFile : "none" );
 
 	puts( "START" );
 
@@ -746,15 +747,15 @@ main (
 	if ( Config.WorldFile != NULL ) {
 		FILE* File = fopen( Config.WorldFile, "r" );
 		if ( not File ) {
-			printf_s( "Could not open file '%s'\n", Config.WorldFile );
-			return;
+			printf( "Could not open file '%s'\n", Config.WorldFile );
+			return( EXIT_FAILURE );
 		}
 		bool OK = LoadWorldFile( File, &World );
 		fclose( File );
 		if ( not OK ) {
-			printf_s( "Failed to load world from file '%s'", Config.WorldFile );
+			printf( "Failed to load world from file '%s'", Config.WorldFile );
 			FreeTheWorld( World );
-			return;
+			return( EXIT_FAILURE );
 		}
 	} else {
 		World = AWholeNewWorld( true );
@@ -774,12 +775,13 @@ main (
 	TIMER_STAMP( "RENDER  " );
 
 	{ // Save buffer to PNG file
-		byte Filename[ UCHAR_MAX ];
-		stbiw_convert_wchar_to_utf8(
-			Filename, sizeof( Filename ),
-			L"output.png" );
+		// FIXME: UTF-8 support in any way?
+		//char Filename[ UCHAR_MAX ];
+		//stbiw_convert_wchar_to_utf8(
+		//	Filename, sizeof( Filename ),
+		//	L"output.png" );
 		stbi_write_png(
-			Filename,
+			"output.png",
 			Image.Width, Image.Height,
 			sizeof( rgba8 ),
 			Image.Buffer,
@@ -793,4 +795,6 @@ main (
 	free( Image.Buffer );
 
 	puts( "END" );
+
+	return( EXIT_SUCCESS );
 }

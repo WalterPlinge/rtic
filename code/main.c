@@ -28,15 +28,15 @@
 
 
 
-#define BETWEEN( x, a, b ) ( (a) < (x) and (x) < (b) )
+#define BETWEEN( X, A, B ) ( (A) < (X) and (X) < (B) )
 
-#define CLAMP(    x, a, b ) fmin( fmax( (x), (a) ), (b) )
-#define CLAMP_01( x )      CLAMP(       (x),  0,     1  )
+#define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
+#define CLAMP_01( X )      CLAMP(       (X),  0,     1  )
 
 
 
-#define TIMER_INIT() clock_t _timer = clock();
-#define TIMER_STAMP( str ) printf( "%s: %.3fs\n", str, (real) ( clock() - _timer ) / CLOCKS_PER_SEC ); _timer = clock();
+#define TIMER_INIT() clock_t _Timer = clock();
+#define TIMER_STAMP( Str ) printf( "%s: %.3fs\n", Str, (real) ( clock() - _Timer ) / CLOCKS_PER_SEC ); _Timer = clock();
 
 
 
@@ -64,7 +64,7 @@ u4             typedef rgba8;
 
 
 internal real Random     (                    ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
-internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random(  ); }
+internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
 
 
 

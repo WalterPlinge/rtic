@@ -398,8 +398,6 @@ AWholeNewWorld (
 	return World;
 }
 
-
-
 internal bool
 LoadWorldFile (
 	FILE*  File,

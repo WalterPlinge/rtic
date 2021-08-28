@@ -1,21 +1,32 @@
 #!/bin/sh
 
 AppName="rtic"
+CodeFile="../code/main.c"
 
+Compiler="clang"
+#if command -v mold &> /dev/null; then Compiler="mold --run $Compiler"; fi
+
+# TODO: generate assembly
 Output="-o $AppName"
-Debug="-O0 -g"
-Release="-ffast-math -O2 -fopenmp"
+Warnings="-Wall -Werror -Wno-missing-braces -Wno-unused-function"
 
-CompilerFlags="$Output -std=c11 -pedantic -fno-gnu-keywords -fno-ms-extensions"
-LinkerFlags="--ld-path=mold -L../libs/ -lm"
+CompilerFlags="$Output $Warnings -std=c17 -pedantic -fno-gnu-keywords"
+CompilerDebug="$CompilerFlags -O0 -g"
+CompilerRelease="$CompilerFlags -ffast-math -O2 -fopenmp"
+
+LinkerFlags="-L../libs/ -lm"
+LinkerDebug="$LinkerFlags -debug"
+LinkerRelease="$LinkerFlags"
+
+
 
 if [ ! -d "build" ]; then mkdir build; fi
-pushd build
+cd build
 
-if [ "$1" == "-r" ]; then
-	clang ../code/main.c $Release $CompilerFlags $LinkerFlags
+if [ "$1" = "-r" ]; then
+	$Compiler $CodeFile $CompilerRelease $LinkerRelease
 else
-	clang ../code/main.c $Debug   $CompilerFlags $LinkerFlags
+	$Compiler $CodeFile $CompilerDebug $LinkerDebug
 fi
 
-popd
+cd ..

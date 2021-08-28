@@ -418,7 +418,7 @@ LoadWorldFile (
 		if ( Scan == EOF ) break;
 		if ( Buffer[0] == '#' ) {
 			char C = 0;
-			while ( C != '\n' and C != EOF ) C = fgetc( F );
+			while ( C != '\n' and C != EOF ) C = (char) fgetc( F );
 		}
 
 		else if ( strcmp( "sphere", Buffer ) == 0 ) {

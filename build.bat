@@ -6,15 +6,15 @@ set CodeFile=../code/main.c
 
 set Compiler=cl
 
-set Output=-Fe:%AppName% -Fa%AppName% -FAasu -Zi
-set Warnings=-W4 -WX
+set Output=-Fe:%AppName% -Fa%AppName% -FAasu -Fm%AppName% -Zi
+set Warnings=-Wall -WX -wd4668 -wd4820 -wd5045
 
-set CompilerFlags=%Output% %Warnings% -nologo -analyze- -FC -GR- -GS- -Gw -Gy -std:c17 -TC -utf-8
+set CompilerFlags=%Output% %Warnings% -nologo -analyze- -EHa- -FC -Gm- -GR- -GS- -Gw -Gy -std:c17 -TC -utf-8
 set CompilerDebug=%CompilerFlags% -fp:precise -MTd -Oi
 set CompilerRelease=%CompilerFlags% -fp:fast -GL -MT -O2 -openmp
 
-set LinkerFlags=-link -nologo -libpath:../libs/ -subsystem:console
-set LinkerDebug=%LinkerFlags% -debug
+set LinkerFlags=-link -nologo -incremental:no -opt:ref -subsystem:console -libpath:../libs/
+set LinkerDebug=%LinkerFlags% -debug:full
 set LinkerRelease=%LinkerFlags% -LTCG
 
 if not exist build mkdir build

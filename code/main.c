@@ -63,7 +63,7 @@ u4             typedef rgba8;
 
 
 
-internal real Random     (                    ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
+internal real Random     ( void               ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
 internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
 
 
@@ -116,22 +116,17 @@ internal v3   Refract   ( v3   A, v3   N, real E ) {
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV     (                    ) { return (v3) { Random(), Random(), Random() }; }
-internal v3 RandomRangeV( real Min, real Max ) {
-	return (v3) {
-		RandomRange( Min, Max ),
-		RandomRange( Min, Max ),
-		RandomRange( Min, Max ),
-	};
-}
-internal v3 RandomInUnitSphere() { // HACK: infinite loop
+internal v3 RandomV           ( void                  ) { return (v3) { Random     (          ), Random     (          ), Random     (          ) }; }
+internal v3 RandomRangeV      ( real Min   , real Max ) { return (v3) { RandomRange( Min, Max ), RandomRange( Min, Max ), RandomRange( Min, Max ) }; }
+internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ) };
 		if ( Length2( p ) >= 1.0 ) continue;
 		return p;
 	}
 }
-internal v3 RandomInHemisphere( v3 Normal ) {
+internal v3 RandomUnitVector  ( void                  ) { return Normalise( RandomInUnitSphere() ); }
+internal v3 RandomInHemisphere( v3   Normal           ) {
 	v3 p = RandomInUnitSphere();
 	if ( Dot( p, Normal ) > 0.0 ) {
 		return p;
@@ -139,8 +134,7 @@ internal v3 RandomInHemisphere( v3 Normal ) {
 		return Negate( p );
 	}
 }
-internal v3 RandomUnitVector() { return Normalise( RandomInUnitSphere() ); }
-internal v3 RandomInUnitDisc() { // HACK: infinite loop
+internal v3 RandomInUnitDisc  ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
 		if ( Length2( p ) >= 1.0 ) continue;

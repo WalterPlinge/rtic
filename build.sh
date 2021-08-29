@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 AppName="rtic"
 CodeFile="../code/main.c"
 
 Compiler="clang"
-#if command -v mold &> /dev/null; then Compiler="mold --run $Compiler"; fi
+if command -v mold &> /dev/null; then Compiler="mold --run $Compiler"; fi
 
 # TODO: generate assembly
 Output="-o $AppName"
@@ -21,7 +21,7 @@ LinkerRelease="$LinkerFlags"
 
 
 if [ ! -d "build" ]; then mkdir build; fi
-cd build
+pushd build
 
 if [ "$1" = "-r" ]; then
 	$Compiler $CodeFile $CompilerRelease $LinkerRelease
@@ -29,4 +29,4 @@ else
 	$Compiler $CodeFile $CompilerDebug $LinkerDebug
 fi
 
-cd ..
+popd

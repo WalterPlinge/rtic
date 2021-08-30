@@ -12,7 +12,8 @@ Warnings="-Wall -Werror -Wno-missing-braces -Wno-unused-function"
 
 CompilerFlags="$Output $Warnings -std=c17 -pedantic -fno-gnu-keywords"
 CompilerDebug="$CompilerFlags -O0 -g"
-CompilerRelease="$CompilerFlags -ffast-math -O2 -fopenmp"
+# TODO: openmp seems to be a major cause of slowdown, especially when printing progress
+CompilerRelease="$CompilerFlags -ffast-math -O2" # -fopenmp"
 
 LinkerFlags="-L../libs/ -lm"
 LinkerDebug="$LinkerFlags -debug"

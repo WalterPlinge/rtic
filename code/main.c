@@ -3,12 +3,16 @@
 #include <iso646.h>
 #include <limits.h>
 #include <math.h>
-#include <omp.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+
+// TODO: OpenMP seems to cause a slowdown on (at least my) linux, especially with fflush(stdout)
+#if defined( _WIN32 )
+	#include <omp.h>
+#endif
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
@@ -623,7 +627,10 @@ RenderWorld (
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
 	int y = 0;
+	// TODO: see comment at omp include, only use it on windows for now
+#if defined( _WIN32 )
 	#pragma omp parallel for
+#endif
 	for ( y = 0; y < Image.Height; y += 1 ) {
 		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
 		for ( int x = 0; x < Image.Width; x += 1 ) {
@@ -657,6 +664,7 @@ RenderWorld (
 
 		persistent int Complete = 0;
 		printf( "\rPROGRESS: %.0f%% ", ( 100.0 * ++Complete ) / Image.Height );
+		fflush( stdout );
 	}
 	puts( "\rPROGRESS: DONE" );
 }

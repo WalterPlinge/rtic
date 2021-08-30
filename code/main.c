@@ -91,7 +91,7 @@ ReflectanceSchlick (
 
 
 
-union v3 { real e[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
+union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
 v3 typedef colour;
 
 internal bool NearZero  ( v3   A                 ) { return BETWEEN( A.X, -EPS, EPS ) and BETWEEN( A.Y, -EPS, EPS ) and BETWEEN( A.Z, -EPS, EPS ); }
@@ -124,7 +124,7 @@ internal v3 RandomV           ( void                  ) { return (v3) { Random  
 internal v3 RandomRangeV      ( real Min   , real Max ) { return (v3) { RandomRange( Min, Max ), RandomRange( Min, Max ), RandomRange( Min, Max ) }; }
 internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
 	while ( true ) {
-		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ) };
+		v3 p = RandomRangeV( -1.0, 1.0 );
 		if ( Length2( p ) >= 1.0 ) continue;
 		return p;
 	}

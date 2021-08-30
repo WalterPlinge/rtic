@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
 
 
 
-char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
+global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 	[TOOLCHAIN_MSVC] = {
 		[COMMAND_COMPILER] = ""
 			" cl", // msvc

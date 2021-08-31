@@ -50,18 +50,18 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT];
 
 
 int main(int argc, char** argv) {
-	bool Debug     = true;
-	bool Run       = false;
+	bool Release   = false;
+	bool Execute   = false;
 	bool Mold      = false;
 	int  Toolchain = DEFAULT_TOOLCHAIN;
 
 	for (int a = 1 ; a < argc ; ++a) {
 		char* arg = argv[a];
 		if (strcmp("-r", arg) == 0) {
-			Debug = false;
+			Release = true;
 		} else
 		if (strcmp("-e", arg) == 0) {
-			Run = true;
+			Execute = true;
 		} else
 		if (strcmp("-mold", arg) == 0) {
 			Mold = true;
@@ -94,15 +94,15 @@ int main(int argc, char** argv) {
 	strcat(Command, Strings[Toolchain][COMMAND_OUTPUT   ]);
 	strcat(Command, Strings[Toolchain][COMMAND_WARNINGS ]);
 	strcat(Command, Strings[Toolchain][COMMAND_FLAGS    ]);
-	strcat(Command, Strings[Toolchain][Debug ? COMMAND_DEBUG_FLAGS  : COMMAND_RELEASE_FLAGS ]);
+	strcat(Command, Strings[Toolchain][Release ? COMMAND_DEBUG_FLAGS  : COMMAND_RELEASE_FLAGS ]);
 	strcat(Command, Strings[Toolchain][COMMAND_LINKER   ]);
-	strcat(Command, Strings[Toolchain][Debug ? COMMAND_DEBUG_LINKER : COMMAND_RELEASE_LINKER]);
+	strcat(Command, Strings[Toolchain][Release ? COMMAND_DEBUG_LINKER : COMMAND_RELEASE_LINKER]);
 
 	DEBUG_STRING(Command);
 
 	system(Command);
 
-	if (Run) {
+	if (Execute) {
 		#if defined(_WIN32)
 			system(APP_NAME ".exe");
 		#else

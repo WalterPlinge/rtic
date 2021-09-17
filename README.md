@@ -11,13 +11,10 @@ ray tracer in c
 - loads world info from file (see build/test.world)
 
 ## building
-- platform specific:
-	1. run `build.bat` or `build.sh` for debug build
-	- pass `-r` for release build
-- platform agnostic
-	1. `cd` into build directory
-	2. compile `../build.c`
-	3. run resulting binary to build
+1. make a build directory
+2. `cd` into build directory
+3. compile `../build.c`
+4. now you can run the build executable
 	- pass `-r` for release build
 	- pass `-e` to run app after build
 	- pass `-mold` to use the mold linker

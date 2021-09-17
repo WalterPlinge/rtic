@@ -94,9 +94,9 @@ int main(int argc, char** argv) {
 	strcat(Command, Strings[Toolchain][COMMAND_OUTPUT   ]);
 	strcat(Command, Strings[Toolchain][COMMAND_WARNINGS ]);
 	strcat(Command, Strings[Toolchain][COMMAND_FLAGS    ]);
-	strcat(Command, Strings[Toolchain][Release ? COMMAND_DEBUG_FLAGS  : COMMAND_RELEASE_FLAGS ]);
+	strcat(Command, Strings[Toolchain][Release ? COMMAND_RELEASE_FLAGS  : COMMAND_DEBUG_FLAGS ]);
 	strcat(Command, Strings[Toolchain][COMMAND_LINKER   ]);
-	strcat(Command, Strings[Toolchain][Release ? COMMAND_DEBUG_LINKER : COMMAND_RELEASE_LINKER]);
+	strcat(Command, Strings[Toolchain][Release ? COMMAND_RELEASE_LINKER : COMMAND_DEBUG_LINKER]);
 
 	DEBUG_STRING(Command);
 

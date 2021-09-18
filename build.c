@@ -77,10 +77,10 @@ int main(int argc, char** argv) {
 		} else
 		{
 			printf(
-				"build:                             \n"
-				"\t-r           release             \n"
-				"\t-e           execute             \n"
-				"\t-mold        use mold linker     \n"
+				"build:\n"
+				"\t-r           release\n"
+				"\t-e           execute\n"
+				"\t-mold        use mold linker\n"
 				"\t-<toolchain> (msvc, clang, mingw)\n"
 				);
 			return 0;
@@ -164,7 +164,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 			" -fp:fast" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
 			" -MT"      // Compiles to create a multithreaded executable file, by using LIBCMT.lib.
 			" -O2"      // Creates fast code.
-			" -openmp"  // Enables #pragma omp in source code.
+			//" -openmp"  // Enables #pragma omp in source code.
 			,
 		[COMMAND_LINKER] = ""
 			" -link"              // linker flag
@@ -245,7 +245,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_RELEASE_FLAGS] = ""
 			" -ffast-math" // enables fast math
 			" -O3"         // level 3 optimisation
-			" -fopenmp"    // openmp supprot
+			//" -fopenmp"    // openmp support
 			,
 		[COMMAND_LINKER] = ""
 			" -L../libs/" // add library path

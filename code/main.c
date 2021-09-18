@@ -9,11 +9,6 @@
 #include <string.h>
 #include <time.h>
 
-// TODO: OpenMP seems to cause a slowdown on (at least my) linux, especially with fflush(stdout)
-#if defined( _WIN32 )
-//	#include <omp.h>
-#endif
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #define STB_DS_IMPLEMENTATION
@@ -35,7 +30,7 @@
 #define BETWEEN( X, A, B ) ( (A) < (X) and (X) < (B) )
 
 #define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
-#define CLAMP_01( X )      CLAMP(       (X),  0,     1  )
+#define CLAMP_01( X )      CLAMP(       (X),  0   ,  1  )
 
 
 
@@ -83,9 +78,9 @@ ReflectanceSchlick (
 	real Index
 ) {
 	real r0 = ( 1.0 - Index ) / ( 1.0 + Index );
-	r0 = r0 * r0;
+	     r0 = r0 * r0;
 	real c0 = 1.0 - Cosine;
-	c0 = c0 * c0 * c0 * c0 * c0; // pow( c0, 5 );
+	     c0 = c0 * c0 * c0 * c0 * c0; // pow( c0, 5 );
 	return r0 + ( 1.0 - r0 ) * c0;
 }
 
@@ -97,6 +92,8 @@ v3 typedef colour;
 internal bool NearZero  ( v3   A                 ) { return BETWEEN( A.X, -EPS, EPS ) and BETWEEN( A.Y, -EPS, EPS ) and BETWEEN( A.Z, -EPS, EPS ); }
 internal real Sum       ( v3   A                 ) { return         A.X +       A.Y +       A.Z        ; }
 internal v3   Negate    ( v3   A                 ) { return (v3) { -A.X      , -A.Y      , -A.Z       }; }
+internal real Length2   ( v3   A                 ) { return         A.X * A.X + A.Y * A.Y + A.Z * A.Z  ; }
+internal real Length    ( v3   A                 ) { return sqrt (  A.X * A.X + A.Y * A.Y + A.Z * A.Z ); }
 internal v3   Add       ( v3   A, v3   B         ) { return (v3) {  A.X + B.X,  A.Y + B.Y,  A.Z + B.Z }; }
 internal v3   Sub       ( v3   A, v3   B         ) { return (v3) {  A.X - B.X,  A.Y - B.Y,  A.Z - B.Z }; }
 internal v3   Mul       ( v3   A, v3   B         ) { return (v3) {  A.X * B.X,  A.Y * B.Y,  A.Z * B.Z }; }
@@ -105,27 +102,27 @@ internal v3   AddS      ( v3   A, real B         ) { return (v3) {  A.X + B  ,  
 internal v3   SubS      ( v3   A, real B         ) { return (v3) {  A.X - B  ,  A.Y - B  ,  A.Z - B   }; }
 internal v3   MulS      ( v3   A, real B         ) { return (v3) {  A.X * B  ,  A.Y * B  ,  A.Z * B   }; }
 internal v3   DivS      ( v3   A, real B         ) { return (v3) {  A.X / B  ,  A.Y / B  ,  A.Z / B   }; }
-internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
 internal real Dot       ( v3   A, v3   B         ) { return         A.X * B.X + A.Y * B.Y + A.Z * B.Z  ; }
-internal real Length2   ( v3   A                 ) { return         A.X * A.X + A.Y * A.Y + A.Z * A.Z  ; }
-internal real Length    ( v3   A                 ) { return sqrt(   A.X * A.X + A.Y * A.Y + A.Z * A.Z ); }
 internal v3   Cross     ( v3   A, v3   B         ) { return (v3) { A.Y*B.Z-A.Z*B.Y, A.Z*B.X-A.X*B.Z, A.X*B.Y-A.Y*B.X }; }
-internal v3   Normalise ( v3   A                 ) { return DivS( A, Length ( A ) ); }
-internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add ( MulS( A, 1.0 - T ) , MulS( B, T )   ); }
-internal v3   Reflect   ( v3   A, v3   N         ) { return Sub ( A,    MulS( N, 2.0 * Dot ( A, N ) ) ); }
+internal v3   Sqrt      ( v3   A                 ) { return (v3) { sqrt(A.X) , sqrt(A.Y) , sqrt(A.Z)  }; }
+internal v3   Normalise ( v3   A                 ) { return DivS ( A, Length ( A ) ); }
+internal v3   Lerp      ( v3   A, v3   B, real T ) { return Add  ( MulS( A, 1.0 - T ), MulS( B, T ) ); }
+internal v3   Reflect   ( v3   A, v3   N         ) { return Sub  ( A, MulS( N, 2.0 * Dot ( A, N ) ) ); }
 internal v3   Refract   ( v3   A, v3   N, real E ) {
-	real CosTheta = Dot ( Negate( A ),       N                               );
-	v3   OutPerp  = MulS( Add   ( A  , MulS( N,    CosTheta           ) ), E );
-	v3   OutPara  = MulS( N, -sqrt(    fabs( 1.0 - Length2( OutPerp ) ) )    );
+	real CosTheta = Dot ( Negate  ( A ), N );
+	v3   OutPerp  = MulS( Add     ( A  , MulS( N, CosTheta ) ), E );
+	v3   OutPara  = MulS( N, -sqrt( fabs( 1.0 - Length2( OutPerp ) ) ) );
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV           ( void                  ) { return (v3) { Random     (          ), Random     (          ), Random     (          ) }; }
-internal v3 RandomRangeV      ( real Min   , real Max ) { return (v3) { RandomRange( Min, Max ), RandomRange( Min, Max ), RandomRange( Min, Max ) }; }
+internal v3 RandomV           ( void                  ) { return (v3) { Random(),   Random(),   Random()  }; }
+internal v3 RandomRangeV      ( real Min   , real Max ) { return AddS ( MulS( RandomV(), Max - Min ), Min ); }
 internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = RandomRangeV( -1.0, 1.0 );
-		if ( Length2( p ) >= 1.0 ) continue;
+		if ( Length2( p ) >= 1.0 ) {
+			continue;
+		}
 		return p;
 	}
 }
@@ -141,7 +138,9 @@ internal v3 RandomInHemisphere( v3   Normal           ) {
 internal v3 RandomInUnitDisc  ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
-		if ( Length2( p ) >= 1.0 ) continue;
+		if ( Length2( p ) >= 1.0 ) {
+			continue;
+		}
 		return p;
 	}
 }
@@ -351,12 +350,12 @@ AWholeNewWorld (
 	arrput( World.Planes  , GroundP );
 	arrput( World.PlaneMat, GroundM );
 
-	if ( Randomise )
+	if  ( Randomise )
 	for ( int a = -11; a < 11; ++a )
 	for ( int b = -11; b < 11; ++b ) {
 		real ChooseMat = Random();
 
-		material Mat;
+		material Mat = {0};
 		sphere   Sphere = {
 			.Center = { a + 0.9 * Random(), b * 0.9 * Random(), 0.2 },
 			.Radius = 0.2
@@ -403,23 +402,29 @@ LoadWorldFile (
 	FILE*  File,
 	world* World
 ) {
-	enum primitive { PRIM_NONE, PRIM_SPHERE, PRIM_PLANE, PRIM_COUNT } typedef primitive;
-	primitive MatPrimitive = 0;
+	material** MatList = NULL;
 
-	FILE* F  = File;
-	int Scan = 1;
-	char Buffer[UCHAR_MAX] = {0};
+	FILE* F    = File;
+	int   Scan = 1;
+	char  Buffer[UCHAR_MAX] = {0};
 
 	while ( Scan != EOF ) {
 		// HACK: provide length in string, equal to `(uint) sizeof( Buffer ) - 1`
 		Scan = fscanf( F, "%254s", Buffer );
-		if ( Scan == EOF ) break;
-		if ( Buffer[0] == '#' ) {
-			char C = 0;
-			while ( C != '\n' and C != EOF ) C = (char) fgetc( F );
+
+		if ( Scan == EOF ) {
+			break;
 		}
 
-		else if ( strcmp( "sphere", Buffer ) == 0 ) {
+		if ( Buffer[0] == '#' ) {
+			char C = 0;
+			while ( C != '\n' and C != EOF ) {
+				C = (char) fgetc( F );
+			}
+			continue;
+		}
+
+		if ( strcmp( "sphere", Buffer ) == 0 ) {
 			sphere Sphere = {0};
 			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
@@ -429,10 +434,11 @@ LoadWorldFile (
 				return false;
 			}
 			arrput( World->Spheres, Sphere );
-			MatPrimitive = PRIM_SPHERE;
+			MatList = &World->SphereMat;
+			continue;
 		}
 
-		else if ( strcmp( "plane", Buffer ) == 0 ) {
+		if ( strcmp( "plane", Buffer ) == 0 ) {
 			plane Plane = {0};
 			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf",
 				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
@@ -442,10 +448,11 @@ LoadWorldFile (
 				return false;
 			}
 			arrput( World->Planes, Plane );
-			MatPrimitive = PRIM_PLANE;
+			MatList = &World->PlaneMat;
+			continue;
 		}
 
-		else if ( strcmp( "lambertian", Buffer ) == 0 ) {
+		if ( strcmp( "lambertian", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_LAMBERTIAN };
 			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
@@ -453,15 +460,14 @@ LoadWorldFile (
 				printf( "Could not read values for 'lambertian'\n" );
 				return false;
 			}
-			if ( MatPrimitive == PRIM_PLANE ) {
-				arrput( World->PlaneMat, Mat );
-			} else if ( MatPrimitive == PRIM_SPHERE ) {
-				arrput( World->SphereMat, Mat );
+			if ( MatList != NULL ) {
+				arrput( *MatList, Mat );
+				MatList = NULL;
 			}
-			MatPrimitive = PRIM_NONE;
+			continue;
 		}
 
-		else if ( strcmp( "metal", Buffer ) == 0 ) {
+		if ( strcmp( "metal", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_METAL };
 			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
@@ -470,15 +476,14 @@ LoadWorldFile (
 				printf( "Could not read values for 'metal'\n" );
 				return false;
 			}
-			if ( MatPrimitive == PRIM_PLANE ) {
-				arrput( World->PlaneMat, Mat );
-			} else if ( MatPrimitive == PRIM_SPHERE ) {
-				arrput( World->SphereMat, Mat );
+			if ( MatList != NULL ) {
+				arrput( *MatList, Mat );
+				MatList = NULL;
 			}
-			MatPrimitive = PRIM_NONE;
+			continue;
 		}
 
-		else if ( strcmp( "dielectric", Buffer ) == 0 ) {
+		if ( strcmp( "dielectric", Buffer ) == 0 ) {
 			material Mat = { .Type = MAT_DIELECTRIC };
 			Scan = fscanf( F, "%lf",
 				&Mat.RefractiveIndex );
@@ -486,12 +491,11 @@ LoadWorldFile (
 				printf( "Could not read values for 'dielectric'\n" );
 				return false;
 			}
-			if ( MatPrimitive == PRIM_PLANE ) {
-				arrput( World->PlaneMat, Mat );
-			} else if ( MatPrimitive == PRIM_SPHERE ) {
-				arrput( World->SphereMat, Mat );
+			if ( MatList != NULL ) {
+				arrput( *MatList, Mat );
+				MatList = NULL;
 			}
-			MatPrimitive = PRIM_NONE;
+			continue;
 		}
 	}
 
@@ -615,8 +619,8 @@ internal void
 RenderWorld (
 	image_buffer Image,
 	world        World,
-	int         Samples,
-	int         Depth
+	int          Samples,
+	int          Depth
 ) {
 	v3     Position   = { 13.0, -3.0, 2.0 };
 	v3     Target     = {  0.0,  0.0, 0.0 };
@@ -626,12 +630,7 @@ RenderWorld (
 	real   Aperture   = 0.2;
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
-	int y = 0;
-	// TODO: see comment at omp include, only use it on windows for now
-#if defined( _WIN32 )
-	//#pragma omp parallel for
-#endif
-	for ( y = 0; y < Image.Height; y += 1 ) {
+	for ( int y = 0; y < Image.Height; y += 1 ) {
 		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
 		for ( int x = 0; x < Image.Width; x += 1 ) {
 			rgba8* Pixel = Row + x;

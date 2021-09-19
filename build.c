@@ -22,6 +22,7 @@ enum TOOLCHAIN {
 	TOOLCHAIN_CLANG,
 	TOOLCHAIN_GCC,
 	TOOLCHAIN_MINGW,
+	TOOLCHAIN_PELLESC,
 	TOOLCHAIN_COUNT,
 } typedef TOOLCHAIN;
 
@@ -79,6 +80,9 @@ int main(int argc, char** argv) {
 		} else
 		if (STRING_EQUAL("-mingw", arg)) {
 			Toolchain = TOOLCHAIN_MINGW;
+		} else
+		if (strcmp("-pellesc", arg) == 0) {
+			Toolchain = TOOLCHAIN_PELLESC;
 		} else
 		{
 			printf(
@@ -293,6 +297,46 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_LINKER] = ""
 			" -L../libs/" // add library path
 			" -lm"        // link to maths library
+			,
+		[COMMAND_DEBUG_LINKER] = ""
+			,
+		[COMMAND_RELEASE_LINKER] = ""
+			,
+	},
+	[TOOLCHAIN_PELLESC] = {
+		[COMMAND_COMPILER] = ""
+			" pocc"
+			,
+		[COMMAND_CODE_FILE] = ""
+			" " CODE_FILE
+			,
+		[COMMAND_OUTPUT] = ""
+			" -Fo" APP_NAME
+			,
+		[COMMAND_WARNINGS] = ""
+			" -W2"    // Set warning level 0, 1 or 2 (default: 1)
+			//" -Wd<n>" // Disable warning #n
+			,
+		[COMMAND_FLAGS] = ""
+			" -arch:SSE2" // Select X64 architecture AVX, AVX2, or SSE2 (default: SSE2)
+			" -GT"        // Generate fiber-safe access for thread local storage
+			//" -I<path>"   // Add a search path for #include files
+			//" -J"         // Default char type is unsigned
+			//" -MT"        // Enable multi-threading support (CRTMT*.LIB)
+			" -std:C17"   // Select language mode C17, C11 or C99 (default: C17)
+			,
+		[COMMAND_DEBUG_FLAGS] = ""
+			//" -fp:PRECISE" // Set floating-point model PRECISE or FAST (default: PRECISE)
+			" -Gi"         // Enable trap for signed integer overflow
+			" -Zi"         // Enable full debugging information
+			,
+		[COMMAND_RELEASE_FLAGS] = ""
+			" -fp:FAST" // Set floating-point model PRECISE or FAST (default: PRECISE)
+			//" -openmp"  // Enable OpenMP 3.1 extensions
+			" -Ot"      // Optimise (favouring: Os/Ot - space/speed)
+			" -Ox"      // Perform maximum optimisations
+			,
+		[COMMAND_LINKER] = ""
 			,
 		[COMMAND_DEBUG_LINKER] = ""
 			,

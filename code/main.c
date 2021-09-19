@@ -32,6 +32,8 @@
 #define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
 #define CLAMP_01( X )      CLAMP(       (X),  0   ,  1  )
 
+#define STRINGS_EQUAL( A, B ) ( strcmp( A, B ) == 0 )
+
 
 
 #define TIMER_INIT() clock_t _Timer = clock();
@@ -290,20 +292,20 @@ HitPlane (
 
 
 struct world {
-	sphere*   Spheres;
-	material* SphereMat;
-	plane*    Planes;
-	material* PlaneMat;
+	sphere*   Sphere;
+	material* SphereMats;
+	plane*    Plane;
+	material* PlaneMats;
 } typedef world;
 
 internal void
 FreeTheWorld (
 	world World
 ) {
-	arrfree( World.Spheres   );
-	arrfree( World.SphereMat );
-	arrfree( World.Planes    );
-	arrfree( World.PlaneMat  );
+	arrfree( World.Sphere       );
+	arrfree( World.SphereMats   );
+	arrfree( World.Plane        );
+	arrfree( World.PlaneMats    );
 }
 
 internal bool
@@ -318,20 +320,20 @@ HitWorld (
 	bool     Hit = false;
 	real Closest = Far;
 
-	for ( int i = 0; i < arrlen( World.Spheres ); ++i ) {
-		if ( HitSphere( Ray, World.Spheres[i], Near, Closest, &Tmp ) ) {
+	for ( int i = 0; i < arrlen( World.Sphere ); ++i ) {
+		if ( HitSphere( Ray, World.Sphere[i], Near, Closest, &Tmp ) ) {
 			Hit          = true;
 			Closest      = Tmp.Distance;
-			Tmp.Material = World.SphereMat[i];
+			Tmp.Material = World.SphereMats[i];
 			*Info        = Tmp;
 		}
 	}
 
-	for ( int i = 0; i < arrlen( World.Planes ); ++i ) {
-		if ( HitPlane( Ray, World.Planes[i], Near, Closest, &Tmp ) ) {
+	for ( int i = 0; i < arrlen( World.Plane ); ++i ) {
+		if ( HitPlane( Ray, World.Plane[i], Near, Closest, &Tmp ) ) {
 			Hit          = true;
 			Closest      = Tmp.Distance;
-			Tmp.Material = World.PlaneMat[i];
+			Tmp.Material = World.PlaneMats[i];
 			*Info        = Tmp;
 		}
 	}
@@ -345,10 +347,11 @@ AWholeNewWorld (
 ) {
 	world World = {0};
 
-	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = { 0.0, 0.0, 1.0 } };
-	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_LAMBERTIAN    };
-	arrput( World.Planes  , GroundP );
-	arrput( World.PlaneMat, GroundM );
+	v3       GroundN = { 0.0, 0.0, 1.0 };
+	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = Normalise( GroundN ) };
+	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_LAMBERTIAN       };
+	arrput( World.Plane    , GroundP );
+	arrput( World.PlaneMats, GroundM );
 
 	if  ( Randomise )
 	for ( int a = -11; a < 11; ++a )
@@ -374,25 +377,25 @@ AWholeNewWorld (
 				Mat.RefractiveIndex = 1.5;
 			}
 
-			arrput( World.Spheres  , Sphere );
-			arrput( World.SphereMat, Mat    );
+			arrput( World.Sphere    , Sphere );
+			arrput( World.SphereMats, Mat    );
 		}
 	}
 
 	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius          = 1.0 };
 	material Material1 = { .Type   = MAT_DIELECTRIC    , .RefractiveIndex = 1.5 };
-	arrput( World.Spheres  , Sphere1   );
-	arrput( World.SphereMat, Material1 );
+	arrput( World.Sphere    , Sphere1   );
+	arrput( World.SphereMats, Material1 );
 
 	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0            };
 	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = MAT_LAMBERTIAN };
-	arrput( World.Spheres  , Sphere2   );
-	arrput( World.SphereMat, Material2 );
+	arrput( World.Sphere    , Sphere2   );
+	arrput( World.SphereMats, Material2 );
 
 	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                    };
 	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = MAT_METAL };
-	arrput( World.Spheres  , Sphere3   );
-	arrput( World.SphereMat, Material3 );
+	arrput( World.Sphere    , Sphere3   );
+	arrput( World.SphereMats, Material3 );
 
 	return World;
 }
@@ -424,7 +427,7 @@ LoadWorldFile (
 			continue;
 		}
 
-		if ( strcmp( "sphere", Buffer ) == 0 ) {
+		if ( STRINGS_EQUAL( "sphere", Buffer ) ) {
 			sphere Sphere = {0};
 			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
@@ -433,12 +436,12 @@ LoadWorldFile (
 				printf( "Could not read values for 'sphere'\n" );
 				return false;
 			}
-			arrput( World->Spheres, Sphere );
-			MatList = &World->SphereMat;
+			arrput( World->Sphere, Sphere );
+			MatList = &World->SphereMats;
 			continue;
 		}
 
-		if ( strcmp( "plane", Buffer ) == 0 ) {
+		if ( STRINGS_EQUAL( "plane", Buffer ) ) {
 			plane Plane = {0};
 			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf",
 				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
@@ -447,12 +450,13 @@ LoadWorldFile (
 				printf( "Could not read values for 'plane'\n" );
 				return false;
 			}
-			arrput( World->Planes, Plane );
-			MatList = &World->PlaneMat;
+			Plane.Normal = Normalise( Plane.Normal );
+			arrput( World->Plane, Plane );
+			MatList = &World->PlaneMats;
 			continue;
 		}
 
-		if ( strcmp( "lambertian", Buffer ) == 0 ) {
+		if ( STRINGS_EQUAL( "lambertian", Buffer ) ) {
 			material Mat = { .Type = MAT_LAMBERTIAN };
 			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
@@ -467,7 +471,7 @@ LoadWorldFile (
 			continue;
 		}
 
-		if ( strcmp( "metal", Buffer ) == 0 ) {
+		if ( STRINGS_EQUAL( "metal", Buffer ) ) {
 			material Mat = { .Type = MAT_METAL };
 			Scan = fscanf( F, "%lf %lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
@@ -483,7 +487,7 @@ LoadWorldFile (
 			continue;
 		}
 
-		if ( strcmp( "dielectric", Buffer ) == 0 ) {
+		if ( STRINGS_EQUAL( "dielectric", Buffer ) ) {
 			material Mat = { .Type = MAT_DIELECTRIC };
 			Scan = fscanf( F, "%lf",
 				&Mat.RefractiveIndex );
@@ -699,12 +703,12 @@ ParseArgs (
 	for ( int a = 1; a < argc; ++a ) {
 		char* arg = argv[a];
 
-		     if ( strcmp( "-?", arg ) == 0 or a >= argc - 1 ) { Help  = true; break; }
-		else if ( strcmp( "-w", arg ) == 0 ) { Config.Width     = atoi( argv[++a] ); }
-		else if ( strcmp( "-h", arg ) == 0 ) { Config.Height    = atoi( argv[++a] ); }
-		else if ( strcmp( "-s", arg ) == 0 ) { Config.Samples   = atoi( argv[++a] ); }
-		else if ( strcmp( "-d", arg ) == 0 ) { Config.Depth     = atoi( argv[++a] ); }
-		else if ( strcmp( "-f", arg ) == 0 ) { Config.WorldFile =       argv[++a]  ; }
+		     if ( STRINGS_EQUAL( "-?", arg ) or a >= argc - 1 ) { Help  = true; break; }
+		else if ( STRINGS_EQUAL( "-w", arg ) ) { Config.Width     = atoi( argv[++a] ); }
+		else if ( STRINGS_EQUAL( "-h", arg ) ) { Config.Height    = atoi( argv[++a] ); }
+		else if ( STRINGS_EQUAL( "-s", arg ) ) { Config.Samples   = atoi( argv[++a] ); }
+		else if ( STRINGS_EQUAL( "-d", arg ) ) { Config.Depth     = atoi( argv[++a] ); }
+		else if ( STRINGS_EQUAL( "-f", arg ) ) { Config.WorldFile =       argv[++a]  ; }
 		else { Help = true; break; }
 	}
 

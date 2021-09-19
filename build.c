@@ -8,6 +8,7 @@
 #define global static
 
 #define DEBUG_STRING(String) printf("[%zi] %s\n", strlen(String), String);
+#define STRING_EQUAL(A, B) (strcmp(A, B) == 0)
 
 
 
@@ -19,6 +20,7 @@
 enum TOOLCHAIN {
 	TOOLCHAIN_MSVC,
 	TOOLCHAIN_CLANG,
+	TOOLCHAIN_GCC,
 	TOOLCHAIN_MINGW,
 	TOOLCHAIN_COUNT,
 } typedef TOOLCHAIN;
@@ -57,22 +59,25 @@ int main(int argc, char** argv) {
 
 	for (int a = 1 ; a < argc ; ++a) {
 		char* arg = argv[a];
-		if (strcmp("-r", arg) == 0) {
+		if (STRING_EQUAL("-r", arg)) {
 			Release = true;
 		} else
-		if (strcmp("-e", arg) == 0) {
+		if (STRING_EQUAL("-e", arg)) {
 			Execute = true;
 		} else
-		if (strcmp("-mold", arg) == 0) {
+		if (STRING_EQUAL("-mold", arg)) {
 			Mold = true;
 		} else
-		if (strcmp("-msvc", arg) == 0) {
+		if (STRING_EQUAL("-msvc", arg)) {
 			Toolchain = TOOLCHAIN_MSVC;
 		} else
-		if (strcmp("-clang", arg) == 0) {
+		if (STRING_EQUAL("-clang", arg)) {
 			Toolchain = TOOLCHAIN_CLANG;
 		} else
-		if (strcmp("-mingw", arg) == 0) {
+		if (STRING_EQUAL("-gcc", arg)) {
+			Toolchain = TOOLCHAIN_GCC;
+		} else
+		if (STRING_EQUAL("-mingw", arg)) {
 			Toolchain = TOOLCHAIN_MINGW;
 		} else
 		{
@@ -81,7 +86,8 @@ int main(int argc, char** argv) {
 				"\t-r           release\n"
 				"\t-e           execute\n"
 				"\t-mold        use mold linker\n"
-				"\t-<toolchain> (msvc, clang, mingw)\n"
+				"\t-<toolchain> [ msvc* | clang* | gcc | mingw ]\n"
+				"\t             (* default for [ windows | other ])\n"
 				);
 			return 0;
 		}
@@ -215,6 +221,43 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 			,
 		[COMMAND_DEBUG_LINKER] = ""
 			" -debug" // debug linking
+			,
+		[COMMAND_RELEASE_LINKER] = ""
+			,
+	},
+	[TOOLCHAIN_GCC] = {
+		[COMMAND_COMPILER ] = ""
+			" gcc", // clang with mold linker
+		[COMMAND_CODE_FILE] = ""
+			" " CODE_FILE,
+		[COMMAND_OUTPUT] = ""
+			" -o " APP_NAME // output executable name
+			,
+		[COMMAND_WARNINGS] = ""
+			" -Werror"              // treat all warnings as errors
+			" -Wall"                // all warnings (not all warnings)
+			" -Wno-missing-braces"  //
+			" -Wno-unused-function" //
+			" -Wno-unknown-pragmas" //
+			,
+		[COMMAND_FLAGS] = ""
+			" -std=c17"          // C17 language standard
+			" -pedantic"         // ISO conformance
+			,
+		[COMMAND_DEBUG_FLAGS] = ""
+			" -O0"
+			" -g"
+			,
+		[COMMAND_RELEASE_FLAGS] = ""
+			" -ffast-math" // enables fast math
+			" -O3"         // level 3 optimisation
+			//" -fopenmp"    // openmp supprot
+			,
+		[COMMAND_LINKER] = ""
+			" -L../libs/" // add library path
+			" -lm"        // link to maths library
+			,
+		[COMMAND_DEBUG_LINKER] = ""
 			,
 		[COMMAND_RELEASE_LINKER] = ""
 			,

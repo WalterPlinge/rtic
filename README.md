@@ -2,13 +2,12 @@
 ray tracer in c
 
 ## so far
-- spheres
+- spheres, planes, triangles
 - diffuse, metal, dielectric materials
 - multi-sampling (naive sampling tbh)
-- openmp multithreading
 - png output
-- command line config (set width, height, samples, depth)
-- loads world info from file (see build/test.world)
+- command line config (set width, height, samples, depth, world file)
+- loads world info from file (see example/test.world)
 
 ## building
 1. make a build directory
@@ -18,4 +17,6 @@ ray tracer in c
 	- pass `-r` for release build
 	- pass `-e` to run app after build
 	- pass `-mold` to use the mold linker
-	- pass `-<msvc|clang|mingw>` to build using specific toolchain
+	- pass `-[msvc|clang|gcc|mingw]` to build using specific toolchain
+
+- A basic CMakeLists.txt file is provided

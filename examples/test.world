@@ -2,8 +2,9 @@
 # Values can have any number of whitespace characters between them
 
 # Primitives:
-# sphere X Y Z  R
-# plane  X Y Z  NX NY NZ
+# sphere      X  Y  Z   R
+# plane       X  Y  Z   NX NY NZ
+# triangle   AX AY AZ   BX BY BZ   CX CY CZ
 
 # Materials:
 # lambertian R G B
@@ -11,13 +12,27 @@
 # dielectric         V
 
 # Material V values:
-	# metal      = 'roughness' value
-	# dielectric = 'refractive index' value
+# metal      = 'roughness'        value
+# dielectric = 'refractive index' value
 
-plane     0.0  0.0 0.0   0.0 0.0 1.0   lambertian   0.5 0.5 0.5
-sphere    0.0  0.0 1.0   1.0           dielectric                  1.5
-sphere    0.0  0.0 1.0  -0.95          dielectric                  1.5
-sphere   -4.0 -1.0 1.0   1.0           lambertian   0.4 0.2 0.1
-sphere    4.0  1.0 1.0   1.0           metal        0.7 0.6 0.5    0.0
-sphere    1.0 -4.0 1.0   1.0           metal        0.1 0.4 0.2    0.2
-sphere   -1.0  4.0 1.0   1.0           lambertian   0.2 0.1 0.4
+
+
+plane     0.0  0.0 -1.0    0.0  0.0 1.0   lambertian   0.5 0.5 0.5
+
+sphere    1.0  0.0 0.0     1.0    dielectric                 1.5
+sphere    1.0  0.0 0.0    -0.95   dielectric                 1.5
+sphere    1.0  3.0 0.0     1.0    metal        0.8 0.6 0.5   0.0
+sphere    1.0 -2.0 -0.7    0.3    lambertian   0.2 0.5 0.2
+sphere    1.0 -2.0 -0.1    0.3    lambertian   0.5 0.4 0.2
+sphere    1.0 -2.0  0.5    0.3    lambertian   0.5 0.2 0.2
+
+triangle
+	-0.9 -3.0 -1.0
+	-0.9  3.0 -1.0
+	-1.0  3.0  2.0
+	metal   0.6 0.8 0.7   0.0
+triangle
+	-1.0  3.0  2.0
+	-1.0 -3.0  2.0
+	-0.9 -3.0 -1.0
+	metal   0.6 0.8 0.7   0.0

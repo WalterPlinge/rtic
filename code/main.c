@@ -291,11 +291,55 @@ HitPlane (
 
 
 
+struct triangle { v3 A, B, C; } typedef triangle;
+
+internal bool
+HitTriangle (
+	ray       Ray,
+	triangle  Tri,
+	real      Near,
+	real      Far,
+	hit_info* Info
+) {
+	v3   e1  = Sub  ( Tri.B  , Tri.A );
+	v3   e2  = Sub  ( Tri.C  , Tri.A );
+	v3   p   = Cross( Ray.Dir, e2    );
+	real det = Dot  ( p      , e1    );
+	if ( det > -EPS and det < EPS ) {
+		return false;
+	}
+	real inv = 1.0 / det;
+	v3   t   = Sub( Ray.Pos, Tri.A );
+	real u   = Dot( t, p ) * inv;
+	if ( u < 0.0 or u > 1.0 ) {
+		return false;
+	}
+	v3   q = Cross( t, e1 );
+	real v = Dot  ( Ray.Dir, q ) * inv;
+	if ( v < 0.0 or u + v > 1.0 ) {
+		return false;
+	}
+	real Distance = Dot( e2, q ) * inv;
+	if ( not BETWEEN( Distance, Near, Far ) ) {
+		return false;
+	}
+	v3 Normal = Normalise( Cross( e1, e2 ) );
+
+	Info->Distance = Distance;
+	Info->Point    = PointOnRayAt( Ray, Distance );
+	SetFaceNormal( Info, Ray, Normal );
+	return true;
+}
+
+
+
 struct world {
 	sphere*   Sphere;
 	material* SphereMats;
 	plane*    Plane;
 	material* PlaneMats;
+	triangle* Triangle;
+	material* TriangleMats;
 } typedef world;
 
 internal void
@@ -306,6 +350,8 @@ FreeTheWorld (
 	arrfree( World.SphereMats   );
 	arrfree( World.Plane        );
 	arrfree( World.PlaneMats    );
+	arrfree( World.Triangle     );
+	arrfree( World.TriangleMats );
 }
 
 internal bool
@@ -334,6 +380,15 @@ HitWorld (
 			Hit          = true;
 			Closest      = Tmp.Distance;
 			Tmp.Material = World.PlaneMats[i];
+			*Info        = Tmp;
+		}
+	}
+
+	for ( int i = 0; i < arrlen( World.Triangle ); ++i ) {
+		if ( HitTriangle( Ray, World.Triangle[i], Near, Closest, &Tmp ) ) {
+			Hit          = true;
+			Closest      = Tmp.Distance;
+			Tmp.Material = World.TriangleMats[i];
 			*Info        = Tmp;
 		}
 	}
@@ -453,6 +508,17 @@ LoadWorldFile (
 			Plane.Normal = Normalise( Plane.Normal );
 			arrput( World->Plane, Plane );
 			MatList = &World->PlaneMats;
+			continue;
+		}
+
+		if ( STRINGS_EQUAL( "triangle" , Buffer ) ) {
+			triangle Triangle = {0};
+			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf %lf %lf %lf",
+				&Triangle.A.X, &Triangle.A.Y, &Triangle.A.Z,
+				&Triangle.B.X, &Triangle.B.Y, &Triangle.B.Z,
+				&Triangle.C.X, &Triangle.C.Y, &Triangle.C.Z );
+			arrput( World->Triangle, Triangle );
+			MatList = &World->TriangleMats;
 			continue;
 		}
 

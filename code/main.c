@@ -158,7 +158,7 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 
 
-enum material_type { MAT_LAMBERTIAN, MAT_METAL, MAT_DIELECTRIC } typedef material_type;
+enum material_type { MAT_LAMBERTIAN, MAT_METAL, MAT_DIELECTRIC, MAT_EMISSIVE } typedef material_type;
 
 struct material { material_type Type; colour Albedo; union { real Roughness, RefractiveIndex; }; } typedef material;
 
@@ -225,6 +225,11 @@ Scatter (
 			}
 			*Scattered = NewRay( Info.Point, Direction );
 			return true;
+		} break;
+
+		case MAT_EMISSIVE: {
+			*Attenuation = Info.Material.Albedo;
+			return false;
 		} break;
 	}
 
@@ -490,7 +495,7 @@ LoadWorldFile (
 				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
 				&Sphere.Radius );
 			if ( Scan != 4 ) {
-				printf( "Could not read values for 'sphere'\n" );
+				puts( "Could not read values for 'sphere'\n" );
 				return false;
 			}
 			arrput( World->Sphere, Sphere );
@@ -504,7 +509,7 @@ LoadWorldFile (
 				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
 				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
 			if ( Scan != 6 ) {
-				printf( "Could not read values for 'plane'\n" );
+				puts( "Could not read values for 'plane'\n" );
 				return false;
 			}
 			Plane.Normal = Normalise( Plane.Normal );
@@ -519,6 +524,10 @@ LoadWorldFile (
 				&Triangle.A.X, &Triangle.A.Y, &Triangle.A.Z,
 				&Triangle.B.X, &Triangle.B.Y, &Triangle.B.Z,
 				&Triangle.C.X, &Triangle.C.Y, &Triangle.C.Z );
+			if ( Scan != 9 ) {
+				puts( "Could not read values for 'triangle'\n" );
+				return false;
+			}
 			arrput( World->Triangle, Triangle );
 			MatList = &World->TriangleMats;
 			continue;
@@ -529,7 +538,7 @@ LoadWorldFile (
 			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
 			if ( Scan != 3 ) {
-				printf( "Could not read values for 'lambertian'\n" );
+				puts( "Could not read values for 'lambertian'\n" );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -545,7 +554,7 @@ LoadWorldFile (
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
 				&Mat.Roughness );
 			if ( Scan != 4 ) {
-				printf( "Could not read values for 'metal'\n" );
+				puts( "Could not read values for 'metal'\n" );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -560,7 +569,22 @@ LoadWorldFile (
 			Scan = fscanf( F, "%lf",
 				&Mat.RefractiveIndex );
 			if ( Scan != 1 ) {
-				printf( "Could not read values for 'dielectric'\n" );
+				puts( "Could not read values for 'dielectric'\n" );
+				return false;
+			}
+			if ( MatList != NULL ) {
+				arrput( *MatList, Mat );
+				MatList = NULL;
+			}
+			continue;
+		}
+
+		if ( STRINGS_EQUAL( "emissive", Buffer ) ) {
+			material Mat = { .Type = MAT_EMISSIVE };
+			Scan = fscanf( F, "%lf %lf %lf",
+				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
+			if ( Scan != 3 ) {
+				puts( "Could not read values for 'emissive'\n" );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -600,7 +624,13 @@ RayColour (
 
 		colour Attenuation;
 		if ( not Scatter( Ray, Info, &Attenuation, &Ray ) ) {
-			Colour = MulS( Colour, 0.0 );
+			if ( Info.Material.Type == MAT_EMISSIVE ) {
+				// HACK: I don't know how bright colours are supposed to work here
+				v3 Mod = MulS( Attenuation, Dot( Negate( Ray.Dir ), Info.Normal ) );
+				Colour = Mul( Colour, Mod );
+			} else {
+				Colour = MulS( Colour, 0.0 );
+			}
 			break;
 		}
 
@@ -722,6 +752,11 @@ RenderWorld (
 
 			PixelColour = DivS( PixelColour, Samples * Samples );
 			PixelColour = Sqrt( PixelColour );
+
+			//real HDR = fmax(fmax(PixelColour.R, PixelColour.G), PixelColour.B);
+			//if ( HDR > 1.0 ) {
+			//	PixelColour = DivS( PixelColour, HDR );
+			//}
 
 			u1 Red   = (u1) ( 255.999 * CLAMP_01( PixelColour.R ) );
 			u1 Green = (u1) ( 255.999 * CLAMP_01( PixelColour.G ) );

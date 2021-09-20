@@ -7,9 +7,10 @@
 # triangle   AX AY AZ   BX BY BZ   CX CY CZ
 
 # Materials:
-# lambertian R G B
-# metal      R G B   V
-# dielectric         V
+# emissive     R G B
+# lambertian   R G B
+# metal        R G B   V
+# dielectric           V
 
 # Material V values:
 # metal      = 'roughness'        value
@@ -22,9 +23,9 @@ plane     0.0  0.0 -1.0    0.0  0.0 1.0   lambertian   0.5 0.5 0.5
 sphere    1.0  0.0 0.0     1.0    dielectric                 1.5
 sphere    1.0  0.0 0.0    -0.95   dielectric                 1.5
 sphere    1.0  3.0 0.0     1.0    metal        0.8 0.6 0.5   0.0
-sphere    1.0 -2.0 -0.7    0.3    lambertian   0.2 0.5 0.2
-sphere    1.0 -2.0 -0.1    0.3    lambertian   0.5 0.4 0.2
-sphere    1.0 -2.0  0.5    0.3    lambertian   0.5 0.2 0.2
+sphere    1.0 -2.0 -0.7    0.3    emissive     2.2 5.5 2.2
+sphere    1.0 -2.0 -0.1    0.3    emissive     5.5 4.4 2.2
+sphere    1.0 -2.0  0.5    0.3    emissive     5.5 2.2 2.2
 
 triangle
 	-0.9 -3.0 -1.0

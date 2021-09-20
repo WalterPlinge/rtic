@@ -17,7 +17,7 @@
 
 
 #define global     static
-#define internal   static inline
+#define internal   static
 #define persistent static
 
 
@@ -31,6 +31,8 @@
 
 #define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
 #define CLAMP_01( X )      CLAMP(       (X),  0   ,  1  )
+
+#define NEAR_ZERO( V ) BETWEEN( V, -EPS, EPS )
 
 #define STRINGS_EQUAL( A, B ) ( strcmp( A, B ) == 0 )
 
@@ -91,7 +93,7 @@ ReflectanceSchlick (
 union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
 v3 typedef colour;
 
-internal bool NearZero  ( v3   A                 ) { return BETWEEN( A.X, -EPS, EPS ) and BETWEEN( A.Y, -EPS, EPS ) and BETWEEN( A.Z, -EPS, EPS ); }
+internal bool NearZero  ( v3   A                 ) { return NEAR_ZERO( A.X ) and NEAR_ZERO( A.Y ) and NEAR_ZERO( A.Z ); }
 internal real Sum       ( v3   A                 ) { return         A.X +       A.Y +       A.Z        ; }
 internal v3   Negate    ( v3   A                 ) { return (v3) { -A.X      , -A.Y      , -A.Z       }; }
 internal real Length2   ( v3   A                 ) { return         A.X * A.X + A.Y * A.Y + A.Z * A.Z  ; }

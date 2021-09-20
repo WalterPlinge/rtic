@@ -146,6 +146,8 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_WARNINGS] = ""
 			" -WX"     // treat all warnings as errors
 			" -W4"     // warning level 4
+			" -wd4100" // unreferenced formal parameter
+			" -wd4101" // unreferenced local variable
 			" -wd4668" // 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directives'
 			" -wd4820" // 'bytes' bytes padding added after construct 'member_name'
 			" -wd5045" // Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified

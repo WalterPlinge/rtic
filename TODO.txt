@@ -13,7 +13,7 @@
 	* lambertian
 	* metal
 	* dielectric
-	! emissive
+	? emissive (don't know if implemented correctly)
 	! textures
 		! procedural
 		! image

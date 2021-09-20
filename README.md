@@ -3,7 +3,7 @@ ray tracer in c
 
 ## so far
 - spheres, planes, triangles
-- diffuse, metal, dielectric materials
+- emissive, diffuse, metal, dielectric materials
 - multi-sampling (naive sampling tbh)
 - png output
 - command line config (set width, height, samples, depth, world file)

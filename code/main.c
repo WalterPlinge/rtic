@@ -27,10 +27,10 @@
 
 
 
-#define BETWEEN( X, A, B ) ( (A) < (X) and (X) < (B) )
+#define BETWEEN( V, A, B ) ( (A) < (V) and (V) < (B) )
 
-#define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
-#define CLAMP_01( X )      CLAMP(       (X),  0   ,  1  )
+#define CLAMP(    V, A, B )  fmin( fmax( (V), (A) ), (B) )
+#define CLAMP_01( V       ) CLAMP(       (V),  0   ,  1  )
 
 #define NEAR_ZERO( V ) BETWEEN( V, -EPS, EPS )
 
@@ -66,8 +66,8 @@ u4             typedef rgba8;
 
 
 
-internal real Random     ( void               ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
-internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
+internal real Random      ( void               ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
+internal real RandomRange ( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
 
 
 
@@ -90,7 +90,7 @@ ReflectanceSchlick (
 
 
 
-union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
+union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; struct { real I, J, K; }; } typedef v3;
 v3 typedef colour;
 
 internal bool NearZero  ( v3   A                 ) { return NEAR_ZERO( A.X ) and NEAR_ZERO( A.Y ) and NEAR_ZERO( A.Z ); }
@@ -119,9 +119,9 @@ internal v3   Refract   ( v3   A, v3   N, real E ) {
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV           ( void                  ) { return (v3) { Random(),   Random(),   Random()  }; }
-internal v3 RandomRangeV      ( real Min   , real Max ) { return AddS ( MulS( RandomV(), Max - Min ), Min ); }
-internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
+internal v3 RandomV            ( void                  ) { return (v3) { Random(),   Random(),   Random()  }; }
+internal v3 RandomRangeV       ( real Min   , real Max ) { return AddS ( MulS( RandomV(), Max - Min ), Min ); }
+internal v3 RandomInUnitSphere ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = RandomRangeV( -1.0, 1.0 );
 		if ( Length2( p ) >= 1.0 ) {
@@ -130,8 +130,8 @@ internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
 		return p;
 	}
 }
-internal v3 RandomUnitVector  ( void                  ) { return Normalise( RandomInUnitSphere() ); }
-internal v3 RandomInHemisphere( v3   Normal           ) {
+internal v3 RandomUnitVector   ( void                  ) { return Normalise( RandomInUnitSphere() ); }
+internal v3 RandomInHemisphere ( v3   Normal           ) {
 	v3 p = RandomInUnitSphere();
 	if ( Dot( p, Normal ) > 0.0 ) {
 		return p;
@@ -139,7 +139,7 @@ internal v3 RandomInHemisphere( v3   Normal           ) {
 		return Negate( p );
 	}
 }
-internal v3 RandomInUnitDisc  ( void                  ) { // HACK: infinite loop
+internal v3 RandomInUnitDisc   ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
 		if ( Length2( p ) >= 1.0 ) {
@@ -151,28 +151,48 @@ internal v3 RandomInUnitDisc  ( void                  ) { // HACK: infinite loop
 
 
 
-struct ray { v3 Pos, Dir; } typedef ray;
+enum primitive_type {
+	P_RAY,
+	P_SPHERE,
+	P_PLANE,
+	P_TRIANGLE,
+	P_EMISSIVE,
+	P_DIFFUSE,
+	P_DIELECTRIC,
+	P_METAL,
+	P_COUNT,
+} typedef primitive_type;
 
-internal ray NewRay       ( v3  Pos, v3   Dir ) { return (ray) {     Pos, Normalise(     Dir      ) }; }
-internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS     ( Ray.Dir,  T  ) ); }
+struct primitive { primitive_type T; union { real E[9]; v3 V[3]; struct { v3 A, B, C; }; }; } typedef primitive;
+/*
+ray : A = position, B = direction
+shapes
+	sphere   : A = position, B.R = radius
+	plane    : A = position, B   = normal
+	triangle : A = point 1,  B   = point 2, C = point 3
+materials
+	emissive   : A   = colour
+	diffuse    : A   = colour
+	dielectric : A.R = refractive index
+	metal      : A   = colour, B.R = roughness
+*/
 
 
 
-enum material_type { MAT_LAMBERTIAN, MAT_METAL, MAT_DIELECTRIC, MAT_EMISSIVE } typedef material_type;
-
-struct material { material_type Type; colour Albedo; union { real Roughness, RefractiveIndex; }; } typedef material;
-
+internal primitive NewRay       ( v3        Pos, v3   Dir ) { return (primitive) { .T = P_RAY, .A = Pos, .B = Normalise( Dir ) }; }
+internal v3        PointOnRayAt ( primitive Ray, real T   ) { return Add( Ray.A, MulS( Ray.B, T ) ); }
 
 
-struct hit_info { real Distance; v3 Point, Normal; bool FrontFace; material Material; } typedef hit_info;
+
+struct hit_info { real Distance; v3 Point, Normal; bool FrontFace; primitive Material; } typedef hit_info;
 
 internal void
 SetFaceNormal (
 	hit_info* Info,
-	ray       Ray,
+	primitive Ray,
 	v3        OutwardNormal
 ) {
-	Info->FrontFace = Dot( Ray.Dir, OutwardNormal ) < 0.0;
+	Info->FrontFace = Dot( Ray.B, OutwardNormal ) < 0.0;
 	Info->Normal    = Info->FrontFace
 		?         OutwardNormal
 		: Negate( OutwardNormal );
@@ -182,55 +202,57 @@ SetFaceNormal (
 
 internal bool
 Scatter (
-	ray      Ray,
-	hit_info Info,
-	colour*  Attenuation,
-	ray*     Scattered
+	primitive  Ray,
+	hit_info   Info,
+	colour*    Attenuation,
+	primitive* Scattered
 ) {
-	switch ( Info.Material.Type ) {
-		case MAT_LAMBERTIAN: {
+	switch ( Info.Material.T ) {
+		case P_DIFFUSE: {
 			v3 Dir = Add( Info.Normal, RandomUnitVector() );
 			while ( NearZero( Dir ) ) { // HACK: infinite loop
 				Dir = Add( Info.Normal, RandomUnitVector() );
 			}
 			*Scattered   = NewRay( Info.Point, Dir );
-			*Attenuation = Info.Material.Albedo;
+			*Attenuation = Info.Material.A;
 			return true;
 		} break;
 
-		case MAT_METAL: {
-			v3 Reflected = Reflect( Ray.Dir, Info.Normal );
-			v3 Direction = Add( Reflected, MulS( RandomInUnitSphere(), Info.Material.Roughness ) );
+		case P_METAL: {
+			v3 Reflected = Reflect( Ray.B, Info.Normal );
+			v3 Direction = Add( Reflected, MulS( RandomInUnitSphere(), Info.Material.B.I ) );
 			*Scattered   = NewRay( Info.Point, Direction );
-			*Attenuation = Info.Material.Albedo;
-			return Dot( Scattered->Dir, Info.Normal ) > 0.0;
+			*Attenuation = Info.Material.A;
+			return Dot( Scattered->B, Info.Normal ) > 0.0;
 		} break;
 
-		case MAT_DIELECTRIC: {
+		case P_DIELECTRIC: {
 			*Attenuation      = (colour) { 1.0, 1.0, 1.0 };
 			real RefractRatio = Info.FrontFace
-				? ( 1.0 / Info.Material.RefractiveIndex )
-				:         Info.Material.RefractiveIndex;
+				? ( 1.0 / Info.Material.A.R )
+				:         Info.Material.A.R;
 
-			real CosTheta = Dot( Negate( Ray.Dir ), Info.Normal );
+			real CosTheta = Dot( Negate( Ray.B ), Info.Normal );
 			real SinTheta = sqrt( 1.0 - CosTheta * CosTheta );
 
 			bool CannotRefract = RefractRatio * SinTheta > 1.0;
 
 			v3 Direction;
 			if ( CannotRefract or ReflectanceSchlick( CosTheta, RefractRatio ) > Random() ) {
-				Direction = Reflect( Ray.Dir, Info.Normal );
+				Direction = Reflect( Ray.B, Info.Normal );
 			} else {
-				Direction = Refract( Ray.Dir, Info.Normal, RefractRatio );
+				Direction = Refract( Ray.B, Info.Normal, RefractRatio );
 			}
 			*Scattered = NewRay( Info.Point, Direction );
 			return true;
 		} break;
 
-		case MAT_EMISSIVE: {
-			*Attenuation = Info.Material.Albedo;
+		case P_EMISSIVE: {
+			*Attenuation = Info.Material.A;
 			return false;
 		} break;
+
+		default: {} break;
 	}
 
 	return false;
@@ -238,19 +260,17 @@ Scatter (
 
 
 
-struct sphere { v3 Center; real Radius; } typedef sphere;
-
 internal bool
 HitSphere (
-	ray       Ray,
-	sphere    Sphere,
+	primitive Ray,
+	primitive Sphere,
 	real      Near,
 	real      Far,
 	hit_info* Info
 ) {
-	v3   p = Sub( Sphere.Center, Ray.Pos );
-	real m = Dot( Ray.Dir, p );
-	real c = Dot( p      , p ) - Sphere.Radius * Sphere.Radius;
+	v3   p = Sub( Sphere.A, Ray.A );
+	real m = Dot( Ray.B, p );
+	real c = Dot( p      , p ) - Sphere.B.R * Sphere.B.R;
 	real d = m * m - c;
 	if ( d < 0.0 ) {
 		return false;
@@ -266,63 +286,59 @@ HitSphere (
 
 	Info->Distance = Root;
 	Info->Point    = PointOnRayAt( Ray, Root );
-	SetFaceNormal( Info, Ray, DivS( Sub( Info->Point, Sphere.Center ), Sphere.Radius ) );
+	SetFaceNormal( Info, Ray, DivS( Sub( Info->Point, Sphere.A ), Sphere.B.R ) );
 	return true;
 }
 
 
 
-struct plane { v3 Origin, Normal; } typedef plane;
-
 internal bool
 HitPlane (
-	ray       Ray,
-	plane     Plane,
+	primitive Ray,
+	primitive Plane,
 	real      Near,
 	real      Far,
 	hit_info* Info
 ) {
-	real d = Dot( Plane.Normal, Ray.Dir );
+	real d = Dot( Plane.B, Ray.B );
 	if ( d == 0.0 ) {
 		return false;
 	}
-	real t = Dot( Sub( Plane.Origin, Ray.Pos ), Plane.Normal ) / d;
+	real t = Dot( Sub( Plane.A, Ray.A ), Plane.B ) / d;
 	if ( not BETWEEN( t, Near, Far ) ) {
 		return false;
 	}
 	Info->Distance = t;
 	Info->Point    = PointOnRayAt( Ray, t );
-	SetFaceNormal( Info, Ray, Plane.Normal );
+	SetFaceNormal( Info, Ray, Plane.B );
 	return true;
 }
 
 
 
-struct triangle { v3 A, B, C; } typedef triangle;
-
 internal bool
 HitTriangle (
-	ray       Ray,
-	triangle  Tri,
+	primitive Ray,
+	primitive Tri,
 	real      Near,
 	real      Far,
 	hit_info* Info
 ) {
-	v3   e1  = Sub  ( Tri.B  , Tri.A );
-	v3   e2  = Sub  ( Tri.C  , Tri.A );
-	v3   p   = Cross( Ray.Dir, e2    );
-	real det = Dot  ( p      , e1    );
+	v3   e1  = Sub  ( Tri.B, Tri.A );
+	v3   e2  = Sub  ( Tri.C, Tri.A );
+	v3   p   = Cross( Ray.B, e2    );
+	real det = Dot  ( p    , e1    );
 	if ( det > -EPS and det < EPS ) {
 		return false;
 	}
 	real inv = 1.0 / det;
-	v3   t   = Sub( Ray.Pos, Tri.A );
+	v3   t   = Sub( Ray.A, Tri.A );
 	real u   = Dot( t, p ) * inv;
 	if ( u < 0.0 or u > 1.0 ) {
 		return false;
 	}
 	v3   q = Cross( t, e1 );
-	real v = Dot  ( Ray.Dir, q ) * inv;
+	real v = Dot( Ray.B, q ) * inv;
 	if ( v < 0.0 or u + v > 1.0 ) {
 		return false;
 	}
@@ -341,12 +357,12 @@ HitTriangle (
 
 
 struct world {
-	sphere*   Sphere;
-	material* SphereMats;
-	plane*    Plane;
-	material* PlaneMats;
-	triangle* Triangle;
-	material* TriangleMats;
+	primitive* Sphere;
+	primitive* SphereMats;
+	primitive* Plane;
+	primitive* PlaneMats;
+	primitive* Triangle;
+	primitive* TriangleMats;
 } typedef world;
 
 internal void
@@ -363,7 +379,7 @@ FreeTheWorld (
 
 internal bool
 HitWorld (
-	ray       Ray,
+	primitive Ray,
 	world     World,
 	real      Near,
 	real      Far,
@@ -374,30 +390,33 @@ HitWorld (
 	real Closest = Far;
 
 	for ( int i = 0; i < arrlen( World.Sphere ); ++i ) {
-		if ( HitSphere( Ray, World.Sphere[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.SphereMats[i];
-			*Info        = Tmp;
+		if ( not HitSphere( Ray, World.Sphere[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.SphereMats[i];
+		*Info        = Tmp;
 	}
 
 	for ( int i = 0; i < arrlen( World.Plane ); ++i ) {
-		if ( HitPlane( Ray, World.Plane[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.PlaneMats[i];
-			*Info        = Tmp;
+		if ( not HitPlane( Ray, World.Plane[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.PlaneMats[i];
+		*Info        = Tmp;
 	}
 
 	for ( int i = 0; i < arrlen( World.Triangle ); ++i ) {
-		if ( HitTriangle( Ray, World.Triangle[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.TriangleMats[i];
-			*Info        = Tmp;
+		if ( not HitTriangle( Ray, World.Triangle[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.TriangleMats[i];
+		*Info        = Tmp;
 	}
 
 	return Hit;
@@ -409,9 +428,9 @@ AWholeNewWorld (
 ) {
 	world World = {0};
 
-	v3       GroundN = { 0.0, 0.0, 1.0 };
-	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = Normalise( GroundN ) };
-	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_LAMBERTIAN       };
+	v3        GroundN = { 0.0, 0.0, 1.0 };
+	primitive GroundP = { .T = P_PLANE,   .A = { 0.0, 0.0, 0.0 }, .B = Normalise( GroundN ) };
+	primitive GroundM = { .T = P_DIFFUSE, .A = { 0.5, 0.5, 0.5 } };
 	arrput( World.Plane    , GroundP );
 	arrput( World.PlaneMats, GroundM );
 
@@ -420,23 +439,24 @@ AWholeNewWorld (
 	for ( int b = -11; b < 11; ++b ) {
 		real ChooseMat = Random();
 
-		material Mat = {0};
-		sphere   Sphere = {
-			.Center = { a + 0.9 * Random(), b * 0.9 * Random(), 0.2 },
-			.Radius = 0.2
+		primitive Mat = {0};
+		primitive Sphere = {
+			.T   = P_SPHERE,
+			.A   = { a + 0.9 * Random(), b * 0.9 * Random(), 0.2 },
+			.B.R = 0.2
 		};
 
-		if ( Length( Sub( Sphere.Center, (v3) { 4.0, 0.0, 0.2 } ) ) > 0.9 ) {
+		if ( Length( Sub( Sphere.A, (v3) { 4.0, 0.0, 0.2 } ) ) > 0.9 ) {
 			if ( ChooseMat < 0.8 ) {
-				Mat.Type   = MAT_LAMBERTIAN;
-				Mat.Albedo = Mul( RandomV(), RandomV() );
+				Mat.T = P_DIFFUSE;
+				Mat.A = Mul( RandomV(), RandomV() );
 			} else if ( ChooseMat < 0.95 ) {
-				Mat.Type      = MAT_METAL;
-				Mat.Albedo    = RandomRangeV( 0.5, 1.0 );
-				Mat.Roughness = RandomRange ( 0.0, 0.5 );
+				Mat.T   = P_METAL;
+				Mat.A   = RandomRangeV( 0.5, 1.0 );
+				Mat.B.R = RandomRange ( 0.0, 0.5 );
 			} else {
-				Mat.Type            = MAT_DIELECTRIC;
-				Mat.RefractiveIndex = 1.5;
+				Mat.T   = P_DIELECTRIC;
+				Mat.B.I = 1.5;
 			}
 
 			arrput( World.Sphere    , Sphere );
@@ -444,18 +464,18 @@ AWholeNewWorld (
 		}
 	}
 
-	sphere   Sphere1   = { .Center = {  0.0, 0.0, 1.0 }, .Radius          = 1.0 };
-	material Material1 = { .Type   = MAT_DIELECTRIC    , .RefractiveIndex = 1.5 };
+	primitive Sphere1   = { .T = P_SPHERE    , .A   = {  0.0, 0.0, 1.0 }, .B.R = 1.0 };
+	primitive Material1 = { .T = P_DIELECTRIC, .B.I = 1.5 };
 	arrput( World.Sphere    , Sphere1   );
 	arrput( World.SphereMats, Material1 );
 
-	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0            };
-	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = MAT_LAMBERTIAN };
+	primitive Sphere2   = { .T = P_SPHERE , .A = { -4.0, 0.0, 1.0 }, .B.R = 1.0 };
+	primitive Material2 = { .T = P_DIFFUSE, .A = {  0.4, 0.2, 0.1 } };
 	arrput( World.Sphere    , Sphere2   );
 	arrput( World.SphereMats, Material2 );
 
-	sphere   Sphere3   = { .Center = {  4.0, 0.0, 1.0 }, .Radius    = 1.0                    };
-	material Material3 = { .Albedo = {  0.7, 0.6, 0.5 }, .Roughness = 0.0, .Type = MAT_METAL };
+	primitive Sphere3   = { .T = P_SPHERE, .A = { 4.0, 0.0, 1.0 }, .B.R = 1.0 };
+	primitive Material3 = { .T = P_METAL , .A = { 0.7, 0.6, 0.5 }, .B.R = 0.0 };
 	arrput( World.Sphere    , Sphere3   );
 	arrput( World.SphereMats, Material3 );
 
@@ -467,7 +487,24 @@ LoadWorldFile (
 	FILE*  File,
 	world* World
 ) {
-	material** MatList = NULL;
+	struct primitive_map {
+		char           Name[12];
+		int            Count;
+		primitive_type Type;
+		primitive**    PrimList;
+		primitive**    MatList;
+	} typedef primitive_map;
+	primitive_map PrimitiveMap[] = {
+		{ "sphere"    , 4, P_SPHERE    , &World->Sphere  , &World->SphereMats   },
+		{ "plane"     , 6, P_PLANE     , &World->Plane   , &World->PlaneMats    },
+		{ "triangle"  , 9, P_TRIANGLE  , &World->Triangle, &World->TriangleMats },
+		{ "emissive"  , 3, P_EMISSIVE  , NULL, NULL },
+		{ "diffuse"   , 3, P_DIFFUSE   , NULL, NULL },
+		{ "metal"     , 4, P_METAL     , NULL, NULL },
+		{ "dielectric", 1, P_DIELECTRIC, NULL, NULL },
+	};
+
+	primitive** MatList = NULL;
 
 	FILE* F    = File;
 	int   Scan = 1;
@@ -489,109 +526,31 @@ LoadWorldFile (
 			continue;
 		}
 
-		if ( STRINGS_EQUAL( "sphere", Buffer ) ) {
-			sphere Sphere = {0};
-			Scan = fscanf( F, "%lf %lf %lf %lf",
-				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
-				&Sphere.Radius );
-			if ( Scan != 4 ) {
-				puts( "Could not read values for 'sphere'\n" );
-				return false;
+		for ( int p = 0; p < sizeof( PrimitiveMap ) / sizeof( *PrimitiveMap ); ++p ) {
+			primitive_map* PM = &PrimitiveMap[p];
+			if ( not STRINGS_EQUAL( PM->Name, Buffer ) ) {
+				continue;
 			}
-			arrput( World->Sphere, Sphere );
-			MatList = &World->SphereMats;
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "plane", Buffer ) ) {
-			plane Plane = {0};
-			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf",
-				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
-				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
-			if ( Scan != 6 ) {
-				puts( "Could not read values for 'plane'\n" );
-				return false;
+			primitive Prim = { .T = PM->Type };
+			for ( int e = 0; e < PM->Count; ++e ) {
+				Scan = fscanf( F, "%lf", &Prim.E[e] );
+				if ( Scan != 1 ) {
+					printf( "Could not read value %i for '%s'\n",
+					e + 1, PM->Name );
+					return false;
+				}
 			}
-			Plane.Normal = Normalise( Plane.Normal );
-			arrput( World->Plane, Plane );
-			MatList = &World->PlaneMats;
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "triangle" , Buffer ) ) {
-			triangle Triangle = {0};
-			Scan = fscanf( F, "%lf %lf %lf %lf %lf %lf %lf %lf %lf",
-				&Triangle.A.X, &Triangle.A.Y, &Triangle.A.Z,
-				&Triangle.B.X, &Triangle.B.Y, &Triangle.B.Z,
-				&Triangle.C.X, &Triangle.C.Y, &Triangle.C.Z );
-			if ( Scan != 9 ) {
-				puts( "Could not read values for 'triangle'\n" );
-				return false;
-			}
-			arrput( World->Triangle, Triangle );
-			MatList = &World->TriangleMats;
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "lambertian", Buffer ) ) {
-			material Mat = { .Type = MAT_LAMBERTIAN };
-			Scan = fscanf( F, "%lf %lf %lf",
-				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
-			if ( Scan != 3 ) {
-				puts( "Could not read values for 'lambertian'\n" );
-				return false;
-			}
-			if ( MatList != NULL ) {
-				arrput( *MatList, Mat );
+			if ( PM->PrimList != NULL ) {
+				if ( Prim.T == P_PLANE ) {
+					Prim.B = Normalise( Prim.B );
+				}
+				arrput( *PM->PrimList, Prim );
+				MatList = PM->MatList;
+			} else if ( MatList != NULL ) {
+				arrput( *MatList, Prim );
 				MatList = NULL;
 			}
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "metal", Buffer ) ) {
-			material Mat = { .Type = MAT_METAL };
-			Scan = fscanf( F, "%lf %lf %lf %lf",
-				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
-				&Mat.Roughness );
-			if ( Scan != 4 ) {
-				puts( "Could not read values for 'metal'\n" );
-				return false;
-			}
-			if ( MatList != NULL ) {
-				arrput( *MatList, Mat );
-				MatList = NULL;
-			}
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "dielectric", Buffer ) ) {
-			material Mat = { .Type = MAT_DIELECTRIC };
-			Scan = fscanf( F, "%lf",
-				&Mat.RefractiveIndex );
-			if ( Scan != 1 ) {
-				puts( "Could not read values for 'dielectric'\n" );
-				return false;
-			}
-			if ( MatList != NULL ) {
-				arrput( *MatList, Mat );
-				MatList = NULL;
-			}
-			continue;
-		}
-
-		if ( STRINGS_EQUAL( "emissive", Buffer ) ) {
-			material Mat = { .Type = MAT_EMISSIVE };
-			Scan = fscanf( F, "%lf %lf %lf",
-				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
-			if ( Scan != 3 ) {
-				puts( "Could not read values for 'emissive'\n" );
-				return false;
-			}
-			if ( MatList != NULL ) {
-				arrput( *MatList, Mat );
-				MatList = NULL;
-			}
-			continue;
+			break;
 		}
 	}
 
@@ -602,9 +561,9 @@ LoadWorldFile (
 
 internal colour
 RayColour (
-	ray   Ray,
-	world World,
-	int   Depth
+	primitive Ray,
+	world     World,
+	int       Depth
 ) {
 	persistent real Near = 0.0001;
 	persistent real Far  = 1000.0;
@@ -617,16 +576,16 @@ RayColour (
 		if ( not HitWorld( Ray, World, Near, Far, &Info ) ) {
 			persistent colour Sky1 = { .R = 1.0, .G = 1.0, .B = 1.0 };
 			persistent colour Sky2 = { .R = 0.5, .G = 0.7, .B = 1.0 };
-			real T = ( Ray.Dir.Z + 1.0 ) / 2.0;
+			real T = ( Ray.B.Z + 1.0 ) / 2.0;
 			Colour = Mul( Colour, Lerp( Sky1, Sky2, T ) );
 			break;
 		}
 
 		colour Attenuation;
 		if ( not Scatter( Ray, Info, &Attenuation, &Ray ) ) {
-			if ( Info.Material.Type == MAT_EMISSIVE ) {
+			if ( Info.Material.T == P_EMISSIVE ) {
 				// HACK: I don't know how bright colours are supposed to work here
-				v3 Mod = MulS( Attenuation, Dot( Negate( Ray.Dir ), Info.Normal ) );
+				v3 Mod = MulS( Attenuation, Dot( Negate( Ray.B ), Info.Normal ) );
 				Colour = Mul( Colour, Mod );
 			} else {
 				Colour = MulS( Colour, 0.0 );
@@ -692,7 +651,7 @@ NewCamera (
 	};
 }
 
-internal ray
+internal primitive
 CameraRay (
 	camera Cam,
 	real   U,
@@ -741,11 +700,11 @@ RenderWorld (
 
 			for ( int sx = 0; sx < Samples; ++sx )
 			for ( int sy = 0; sy < Samples; ++sy ) {
-				real su = (real) sx   /   Samples;
-				real sv = (real) sy   /   Samples;
-				real  u = ( x +  su ) / ( Image.Width  - 1 );
-				real  v = ( y +  sv ) / ( Image.Height - 1 );
-				ray   r = CameraRay( Cam, u, v );
+				real     su = (real) sx   /   Samples;
+				real     sv = (real) sy   /   Samples;
+				real      u = ( x +  su ) / ( Image.Width  - 1 );
+				real      v = ( y +  sv ) / ( Image.Height - 1 );
+				primitive r = CameraRay( Cam, u, v );
 
 				PixelColour = Add( PixelColour, RayColour( r, World, Depth ) );
 			}

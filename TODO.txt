@@ -10,7 +10,7 @@
 	! cuboids
 	! spheroids
 ! materials
-	* lambertian
+	* diffuse
 	* metal
 	* dielectric
 	? emissive (don't know if implemented correctly)
@@ -32,11 +32,12 @@
 		? ray        - 6 floats - [x y z] [i j k]         - position + direction
 		? sphere     - 4 floats - [x y z]  r              - position + radius
 		? plane      - 6 floats - [x y z] [i j k]         - position + normal
-		? triangle   - 9 floats - [a b c] [i j k] [x y z] - point 1 + point 2 + point 3
-		? lambertian - 3 floats - [r g b]                 - colour
+		? triangle   - 9 floats - [x y z] [i j k] [a b c] - point 1 + point 2 + point 3
+		? emissive   - 3 floats - [r g b]                 - colour
+		? diffuse    - 3 floats - [r g b]                 - colour
 		? metal      - 4 floats - [r g b]  r              - colour   + roughness
 		? dielectric - 1 float  -          i              - refractive index
-		? lego brick - 6 floats - [1 2 3] [4 5 6] [7 8 9]
+		? lego       - 6 floats - [1 2 3] [4 5 6] [7 8 9]
 
 * BUG: sky noise for some reason (was due to race condition from openmp on sample loops)
 ? BUG: When bounce depth is reached, if colour is not set to 0, light seems to be 'added' to the world.

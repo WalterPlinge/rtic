@@ -8,7 +8,7 @@
 
 # Materials:
 # emissive     R G B
-# lambertian   R G B
+# diffuse      R G B
 # metal        R G B   V
 # dielectric           V
 
@@ -18,7 +18,7 @@
 
 
 
-plane     0.0  0.0 -1.0    0.0  0.0 1.0   lambertian   0.5 0.5 0.5
+plane     0.0  0.0 -1.0    0.0  0.0 1.0   diffuse   0.5 0.5 0.5
 
 sphere    1.0  0.0 0.0     1.0    dielectric                 1.5
 sphere    1.0  0.0 0.0    -0.95   dielectric                 1.5

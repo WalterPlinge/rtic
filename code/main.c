@@ -27,10 +27,10 @@
 
 
 
-#define BETWEEN( X, A, B ) ( (A) < (X) and (X) < (B) )
+#define BETWEEN( V, A, B ) ( (A) < (V) and (V) < (B) )
 
-#define CLAMP(    X, A, B ) fmin( fmax( (X), (A) ), (B) )
-#define CLAMP_01( X )      CLAMP(       (X),  0   ,  1  )
+#define CLAMP(    V, A, B )  fmin( fmax( (V), (A) ), (B) )
+#define CLAMP_01( V       ) CLAMP(       (V),  0   ,  1  )
 
 #define NEAR_ZERO( V ) BETWEEN( V, -EPS, EPS )
 
@@ -66,8 +66,8 @@ u4             typedef rgba8;
 
 
 
-internal real Random     ( void               ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
-internal real RandomRange( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
+internal real Random      ( void               ) { return (real) rand() / ( (real) RAND_MAX + 1.0 ); }
+internal real RandomRange ( real Min, real Max ) { return Min + ( Max - Min ) * Random( ); }
 
 
 
@@ -90,7 +90,7 @@ ReflectanceSchlick (
 
 
 
-union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; } typedef v3;
+union v3 { real E[3]; struct { real X, Y, Z; }; struct { real R, G, B; }; struct { real I, J, K; }; } typedef v3;
 v3 typedef colour;
 
 internal bool NearZero  ( v3   A                 ) { return NEAR_ZERO( A.X ) and NEAR_ZERO( A.Y ) and NEAR_ZERO( A.Z ); }
@@ -119,9 +119,9 @@ internal v3   Refract   ( v3   A, v3   N, real E ) {
 	return Add( OutPerp, OutPara );
 }
 
-internal v3 RandomV           ( void                  ) { return (v3) { Random(),   Random(),   Random()  }; }
-internal v3 RandomRangeV      ( real Min   , real Max ) { return AddS ( MulS( RandomV(), Max - Min ), Min ); }
-internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
+internal v3 RandomV            ( void                  ) { return (v3) { Random(),   Random(),   Random()  }; }
+internal v3 RandomRangeV       ( real Min   , real Max ) { return AddS ( MulS( RandomV(), Max - Min ), Min ); }
+internal v3 RandomInUnitSphere ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = RandomRangeV( -1.0, 1.0 );
 		if ( Length2( p ) >= 1.0 ) {
@@ -130,8 +130,8 @@ internal v3 RandomInUnitSphere( void                  ) { // HACK: infinite loop
 		return p;
 	}
 }
-internal v3 RandomUnitVector  ( void                  ) { return Normalise( RandomInUnitSphere() ); }
-internal v3 RandomInHemisphere( v3   Normal           ) {
+internal v3 RandomUnitVector   ( void                  ) { return Normalise( RandomInUnitSphere() ); }
+internal v3 RandomInHemisphere ( v3   Normal           ) {
 	v3 p = RandomInUnitSphere();
 	if ( Dot( p, Normal ) > 0.0 ) {
 		return p;
@@ -139,7 +139,7 @@ internal v3 RandomInHemisphere( v3   Normal           ) {
 		return Negate( p );
 	}
 }
-internal v3 RandomInUnitDisc  ( void                  ) { // HACK: infinite loop
+internal v3 RandomInUnitDisc   ( void                  ) { // HACK: infinite loop
 	while ( true ) {
 		v3 p = { RandomRange( -1.0, 1.0 ), RandomRange( -1.0, 1.0 ), 0.0 };
 		if ( Length2( p ) >= 1.0 ) {
@@ -158,7 +158,7 @@ internal v3  PointOnRayAt ( ray Ray, real T   ) { return  Add  ( Ray.Pos, MulS  
 
 
 
-enum material_type { MAT_LAMBERTIAN, MAT_METAL, MAT_DIELECTRIC, MAT_EMISSIVE } typedef material_type;
+enum material_type { MAT_DIFFUSE, MAT_METAL, MAT_DIELECTRIC, MAT_EMISSIVE } typedef material_type;
 
 struct material { material_type Type; colour Albedo; union { real Roughness, RefractiveIndex; }; } typedef material;
 
@@ -188,7 +188,7 @@ Scatter (
 	ray*     Scattered
 ) {
 	switch ( Info.Material.Type ) {
-		case MAT_LAMBERTIAN: {
+		case MAT_DIFFUSE: {
 			v3 Dir = Add( Info.Normal, RandomUnitVector() );
 			while ( NearZero( Dir ) ) { // HACK: infinite loop
 				Dir = Add( Info.Normal, RandomUnitVector() );
@@ -322,7 +322,7 @@ HitTriangle (
 		return false;
 	}
 	v3   q = Cross( t, e1 );
-	real v = Dot  ( Ray.Dir, q ) * inv;
+	real v = Dot( Ray.Dir, q ) * inv;
 	if ( v < 0.0 or u + v > 1.0 ) {
 		return false;
 	}
@@ -341,9 +341,9 @@ HitTriangle (
 
 
 struct world {
-	sphere*   Sphere;
+	sphere  * Sphere;
 	material* SphereMats;
-	plane*    Plane;
+	plane   * Plane;
 	material* PlaneMats;
 	triangle* Triangle;
 	material* TriangleMats;
@@ -374,30 +374,33 @@ HitWorld (
 	real Closest = Far;
 
 	for ( int i = 0; i < arrlen( World.Sphere ); ++i ) {
-		if ( HitSphere( Ray, World.Sphere[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.SphereMats[i];
-			*Info        = Tmp;
+		if ( not HitSphere( Ray, World.Sphere[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.SphereMats[i];
+		*Info        = Tmp;
 	}
 
 	for ( int i = 0; i < arrlen( World.Plane ); ++i ) {
-		if ( HitPlane( Ray, World.Plane[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.PlaneMats[i];
-			*Info        = Tmp;
+		if ( not HitPlane( Ray, World.Plane[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.PlaneMats[i];
+		*Info        = Tmp;
 	}
 
 	for ( int i = 0; i < arrlen( World.Triangle ); ++i ) {
-		if ( HitTriangle( Ray, World.Triangle[i], Near, Closest, &Tmp ) ) {
-			Hit          = true;
-			Closest      = Tmp.Distance;
-			Tmp.Material = World.TriangleMats[i];
-			*Info        = Tmp;
+		if ( not HitTriangle( Ray, World.Triangle[i], Near, Closest, &Tmp ) ) {
+			continue;
 		}
+		Hit          = true;
+		Closest      = Tmp.Distance;
+		Tmp.Material = World.TriangleMats[i];
+		*Info        = Tmp;
 	}
 
 	return Hit;
@@ -411,7 +414,7 @@ AWholeNewWorld (
 
 	v3       GroundN = { 0.0, 0.0, 1.0 };
 	plane    GroundP = { .Origin = { 0.0, 0.0, 0.0 }, .Normal = Normalise( GroundN ) };
-	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_LAMBERTIAN       };
+	material GroundM = { .Albedo = { 0.5, 0.5, 0.5 }, .Type   = MAT_DIFFUSE       };
 	arrput( World.Plane    , GroundP );
 	arrput( World.PlaneMats, GroundM );
 
@@ -428,7 +431,7 @@ AWholeNewWorld (
 
 		if ( Length( Sub( Sphere.Center, (v3) { 4.0, 0.0, 0.2 } ) ) > 0.9 ) {
 			if ( ChooseMat < 0.8 ) {
-				Mat.Type   = MAT_LAMBERTIAN;
+				Mat.Type   = MAT_DIFFUSE;
 				Mat.Albedo = Mul( RandomV(), RandomV() );
 			} else if ( ChooseMat < 0.95 ) {
 				Mat.Type      = MAT_METAL;
@@ -450,7 +453,7 @@ AWholeNewWorld (
 	arrput( World.SphereMats, Material1 );
 
 	sphere   Sphere2   = { .Center = { -4.0, 0.0, 1.0 }, .Radius = 1.0            };
-	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = MAT_LAMBERTIAN };
+	material Material2 = { .Albedo = {  0.4, 0.2, 0.1 }, .Type   = MAT_DIFFUSE };
 	arrput( World.Sphere    , Sphere2   );
 	arrput( World.SphereMats, Material2 );
 
@@ -495,7 +498,8 @@ LoadWorldFile (
 				&Sphere.Center.X, &Sphere.Center.Y, &Sphere.Center.Z,
 				&Sphere.Radius );
 			if ( Scan != 4 ) {
-				puts( "Could not read values for 'sphere'\n" );
+				printf( "Could not read value %i for 'sphere'\n",
+					Scan + 1 );
 				return false;
 			}
 			arrput( World->Sphere, Sphere );
@@ -509,7 +513,8 @@ LoadWorldFile (
 				&Plane.Origin.X, &Plane.Origin.Y, &Plane.Origin.Z,
 				&Plane.Normal.X, &Plane.Normal.Y, &Plane.Normal.Z );
 			if ( Scan != 6 ) {
-				puts( "Could not read values for 'plane'\n" );
+				printf( "Could not read value %i for 'plane'\n",
+					Scan + 1 );
 				return false;
 			}
 			Plane.Normal = Normalise( Plane.Normal );
@@ -525,7 +530,8 @@ LoadWorldFile (
 				&Triangle.B.X, &Triangle.B.Y, &Triangle.B.Z,
 				&Triangle.C.X, &Triangle.C.Y, &Triangle.C.Z );
 			if ( Scan != 9 ) {
-				puts( "Could not read values for 'triangle'\n" );
+				printf( "Could not read value %i for 'triangle'\n",
+					Scan + 1 );
 				return false;
 			}
 			arrput( World->Triangle, Triangle );
@@ -533,12 +539,13 @@ LoadWorldFile (
 			continue;
 		}
 
-		if ( STRINGS_EQUAL( "lambertian", Buffer ) ) {
-			material Mat = { .Type = MAT_LAMBERTIAN };
+		if ( STRINGS_EQUAL( "diffuse", Buffer ) ) {
+			material Mat = { .Type = MAT_DIFFUSE };
 			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
 			if ( Scan != 3 ) {
-				puts( "Could not read values for 'lambertian'\n" );
+				printf( "Could not read value %i for 'diffuse'\n",
+					Scan + 1 );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -554,7 +561,8 @@ LoadWorldFile (
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B,
 				&Mat.Roughness );
 			if ( Scan != 4 ) {
-				puts( "Could not read values for 'metal'\n" );
+				printf( "Could not read value %i for 'metal'\n",
+					Scan + 1 );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -569,7 +577,8 @@ LoadWorldFile (
 			Scan = fscanf( F, "%lf",
 				&Mat.RefractiveIndex );
 			if ( Scan != 1 ) {
-				puts( "Could not read values for 'dielectric'\n" );
+				printf( "Could not read value %i for 'dielectric'\n",
+					Scan + 1 );
 				return false;
 			}
 			if ( MatList != NULL ) {
@@ -584,7 +593,8 @@ LoadWorldFile (
 			Scan = fscanf( F, "%lf %lf %lf",
 				&Mat.Albedo.R, &Mat.Albedo.G, &Mat.Albedo.B );
 			if ( Scan != 3 ) {
-				puts( "Could not read values for 'emissive'\n" );
+				printf( "Could not read value %i for 'emissive'\n",
+					Scan + 1 );
 				return false;
 			}
 			if ( MatList != NULL ) {

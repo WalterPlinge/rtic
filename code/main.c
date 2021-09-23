@@ -133,11 +133,10 @@ internal v3 RandomInUnitSphere ( void                  ) { // HACK: infinite loo
 internal v3 RandomUnitVector   ( void                  ) { return Normalise( RandomInUnitSphere() ); }
 internal v3 RandomInHemisphere ( v3   Normal           ) {
 	v3 p = RandomInUnitSphere();
-	if ( Dot( p, Normal ) > 0.0 ) {
-		return p;
-	} else {
-		return Negate( p );
+	if ( Dot( p, Normal ) <= 0.0 ) {
+		p = Negate( p );
 	}
+	return p;
 }
 internal v3 RandomInUnitDisc   ( void                  ) { // HACK: infinite loop
 	while ( true ) {
@@ -883,7 +882,7 @@ main (
 		.Buffer = malloc( Config.Width * Config.Height * sizeof( rgba8 ) ),
 		.Width  = Config.Width,
 		.Height = Config.Height,
-		.Pitch  = Config.Width * sizeof( rgba8 ),
+		.Pitch  = Config.Width * (int) sizeof( rgba8 ),
 	};
 
 	TIMER_STAMP( "LOAD    " );

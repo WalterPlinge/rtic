@@ -18,19 +18,13 @@
 
 
 enum TOOLCHAIN {
-	TOOLCHAIN_MSVC,
 	TOOLCHAIN_CLANG,
 	TOOLCHAIN_GCC,
 	TOOLCHAIN_MINGW,
+	TOOLCHAIN_MSVC,
 	TOOLCHAIN_PELLESC,
 	TOOLCHAIN_COUNT,
 } typedef TOOLCHAIN;
-
-#if defined(_WIN32)
-	#define DEFAULT_TOOLCHAIN TOOLCHAIN_MSVC
-#else
-	#define DEFAULT_TOOLCHAIN TOOLCHAIN_CLANG
-#endif
 
 
 
@@ -53,12 +47,14 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT];
 
 
 int main(int argc, char** argv) {
+	// defaults
 	bool Release   = false;
 	bool Execute   = false;
 	bool Mold      = false;
-	int  Toolchain = DEFAULT_TOOLCHAIN;
+	int  Toolchain = TOOLCHAIN_CLANG;
 
-	for (int a = 1 ; a < argc ; ++a) {
+	// argument parsing
+	for (int a = 1; a < argc; ++a) {
 		char* arg = argv[a];
 		if (STRING_EQUAL("-r", arg)) {
 			Release = true;
@@ -69,9 +65,6 @@ int main(int argc, char** argv) {
 		if (STRING_EQUAL("-mold", arg)) {
 			Mold = true;
 		} else
-		if (STRING_EQUAL("-msvc", arg)) {
-			Toolchain = TOOLCHAIN_MSVC;
-		} else
 		if (STRING_EQUAL("-clang", arg)) {
 			Toolchain = TOOLCHAIN_CLANG;
 		} else
@@ -80,6 +73,9 @@ int main(int argc, char** argv) {
 		} else
 		if (STRING_EQUAL("-mingw", arg)) {
 			Toolchain = TOOLCHAIN_MINGW;
+		} else
+		if (STRING_EQUAL("-msvc", arg)) {
+			Toolchain = TOOLCHAIN_MSVC;
 		} else
 		if (strcmp("-pellesc", arg) == 0) {
 			Toolchain = TOOLCHAIN_PELLESC;
@@ -90,13 +86,14 @@ int main(int argc, char** argv) {
 				"\t-r           release\n"
 				"\t-e           execute\n"
 				"\t-mold        use mold linker\n"
-				"\t-<toolchain> [ msvc* | clang* | gcc | mingw ]\n"
-				"\t             (* default for [ windows | other ])\n"
+				"\t-<toolchain> [ clang* | gcc | msvc | mingw ]\n"
+				"\t             (* default)\n"
 				);
 			return 0;
 		}
 	}
 
+	// command building
 	char Command[0xFFF] = {0};
 	if (Mold) strcat(Command, "mold --run ");
 	strcat(Command, Strings[Toolchain][COMMAND_COMPILER ]);
@@ -112,6 +109,7 @@ int main(int argc, char** argv) {
 
 	system(Command);
 
+	// HACK: this whole execute block is probably brittle
 	if (Execute) {
 		#if defined(_WIN32)
 			system(APP_NAME ".exe");
@@ -119,7 +117,7 @@ int main(int argc, char** argv) {
 			if (Toolchain == TOOLCHAIN_MINGW) {
 				system(APP_NAME ".exe");
 			} else {
-				system("./"APP_NAME);
+				system("./" APP_NAME);
 			}
 		#endif
 	}
@@ -130,69 +128,6 @@ int main(int argc, char** argv) {
 
 
 global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
-	[TOOLCHAIN_MSVC] = {
-		[COMMAND_COMPILER] = ""
-			" cl", // msvc
-		[COMMAND_CODE_FILE] = ""
-			" " CODE_FILE,
-		[COMMAND_OUTPUT] = ""
-			" -FAsu"        // generate assembly with utf8 source
-			" -Fa" APP_NAME // output assembly name
-			" -Fe" APP_NAME // output executable name
-			" -Fm" APP_NAME // output map file name
-			" -Fo" APP_NAME // output object file name
-			" -Zi"          // generate debug info
-			,
-		[COMMAND_WARNINGS] = ""
-			" -WX"     // treat all warnings as errors
-			" -W4"     // warning level 4
-			" -wd4100" // unreferenced formal parameter
-			" -wd4101" // unreferenced local variable
-			" -wd4668" // 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directives'
-			" -wd4820" // 'bytes' bytes padding added after construct 'member_name'
-			" -wd5045" // Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
-			,
-		[COMMAND_FLAGS] = ""
-			" -nologo"  // Suppresses display of sign-on banner.
-			//" -analyze" // Enables code analysis.
-			" -EHa-"    // Disables exception handling
-			" -FC"      // Displays the full path of source code files passed to cl.exe in diagnostic text.
-			" -GL"      // Enables whole program optimization.
-			" -Gm-"     // Disables minimal rebuild.
-			" -GR-"     // Disables run-time type information (RTTI).
-			" -GS-"     // Disables checking buffer security.
-			" -Gw"      // Enables whole-program global data optimization.
-			" -Gy"      // Enables function-level linking.
-			" -std:c17" // Enables ISO C17 conformance
-			" -TC"      // Specifies all source files are C.
-			" -utf-8"   // Set source and execution character sets to UTF-8.
-			,
-		[COMMAND_DEBUG_FLAGS] = ""
-			" -fp:precise" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
-			" -MTd"        // Compiles to create a debug multithreaded executable file, by using LIBCMTD.lib.
-			" -Oi"         // Generates intrinsic functions.
-			,
-		[COMMAND_RELEASE_FLAGS] = ""
-			" -fp:fast" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
-			" -MT"      // Compiles to create a multithreaded executable file, by using LIBCMT.lib.
-			" -O2"      // Creates fast code.
-			//" -openmp"  // Enables #pragma omp in source code.
-			,
-		[COMMAND_LINKER] = ""
-			" -link"              // linker flag
-			" -nologo"            // Suppresses the startup banner.
-			" -incremental:no"    // Controls incremental linking.
-			" -opt:ref,icf=4"     // Eliminates functions and data that are never referenced, perform identical COMDAT folding
-			" -subsystem:console" // Tells the operating system how to run the .exe file.
-			" -libpath:../libs/"  // Specifies a path to search before the environmental library path.
-			,
-		[COMMAND_DEBUG_LINKER] = ""
-			" -debug:full" // moves all private symbol information from individual compilation products (object files and libraries) into a single PDB
-			,
-		[COMMAND_RELEASE_LINKER] = ""
-			" -LTCG" // Specifies link-time code generation.
-			,
-	},
 	[TOOLCHAIN_CLANG] = {
 		[COMMAND_COMPILER ] = ""
 			" clang", // clang with mold linker
@@ -303,6 +238,69 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_DEBUG_LINKER] = ""
 			,
 		[COMMAND_RELEASE_LINKER] = ""
+			,
+	},
+	[TOOLCHAIN_MSVC] = {
+		[COMMAND_COMPILER] = ""
+			" cl", // msvc
+		[COMMAND_CODE_FILE] = ""
+			" " CODE_FILE,
+		[COMMAND_OUTPUT] = ""
+			" -FAsu"        // generate assembly with utf8 source
+			" -Fa" APP_NAME // output assembly name
+			" -Fe" APP_NAME // output executable name
+			" -Fm" APP_NAME // output map file name
+			" -Fo" APP_NAME // output object file name
+			" -Zi"          // generate debug info
+			,
+		[COMMAND_WARNINGS] = ""
+			" -WX"     // treat all warnings as errors
+			" -W4"     // warning level 4
+			" -wd4100" // unreferenced formal parameter
+			" -wd4101" // unreferenced local variable
+			" -wd4668" // 'symbol' is not defined as a preprocessor macro, replacing with '0' for 'directives'
+			" -wd4820" // 'bytes' bytes padding added after construct 'member_name'
+			" -wd5045" // Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
+			,
+		[COMMAND_FLAGS] = ""
+			" -nologo"  // Suppresses display of sign-on banner.
+			//" -analyze" // Enables code analysis.
+			" -EHa-"    // Disables exception handling
+			" -FC"      // Displays the full path of source code files passed to cl.exe in diagnostic text.
+			" -GL"      // Enables whole program optimization.
+			" -Gm-"     // Disables minimal rebuild.
+			" -GR-"     // Disables run-time type information (RTTI).
+			" -GS-"     // Disables checking buffer security.
+			" -Gw"      // Enables whole-program global data optimization.
+			" -Gy"      // Enables function-level linking.
+			" -std:c17" // Enables ISO C17 conformance
+			" -TC"      // Specifies all source files are C.
+			" -utf-8"   // Set source and execution character sets to UTF-8.
+			,
+		[COMMAND_DEBUG_FLAGS] = ""
+			" -fp:precise" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
+			" -MTd"        // Compiles to create a debug multithreaded executable file, by using LIBCMTD.lib.
+			" -Oi"         // Generates intrinsic functions.
+			,
+		[COMMAND_RELEASE_FLAGS] = ""
+			" -fp:fast" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
+			" -MT"      // Compiles to create a multithreaded executable file, by using LIBCMT.lib.
+			" -O2"      // Creates fast code.
+			//" -openmp"  // Enables #pragma omp in source code.
+			,
+		[COMMAND_LINKER] = ""
+			" -link"              // linker flag
+			" -nologo"            // Suppresses the startup banner.
+			" -incremental:no"    // Controls incremental linking.
+			" -opt:ref,icf=4"     // Eliminates functions and data that are never referenced, perform identical COMDAT folding
+			" -subsystem:console" // Tells the operating system how to run the .exe file.
+			" -libpath:../libs/"  // Specifies a path to search before the environmental library path.
+			,
+		[COMMAND_DEBUG_LINKER] = ""
+			" -debug:full" // moves all private symbol information from individual compilation products (object files and libraries) into a single PDB
+			,
+		[COMMAND_RELEASE_LINKER] = ""
+			" -LTCG" // Specifies link-time code generation.
 			,
 	},
 	[TOOLCHAIN_PELLESC] = {

@@ -17,6 +17,6 @@ ray tracer in c
 	- pass `-r` for release build
 	- pass `-e` to run app after build
 	- pass `-mold` to use the mold linker
-	- pass `-[msvc|clang|gcc|mingw]` to build using specific toolchain
+	- pass `-[ clang (default) | gcc | msvc | mingw ]` to build using specific toolchain
 
-- A basic CMakeLists.txt file is provided
+- A basic `CMakeLists.txt` file is provided

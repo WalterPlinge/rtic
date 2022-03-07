@@ -19,4 +19,4 @@ ray tracer in c
 	- pass `-mold` to use the mold linker
 	- pass `-[ clang (default) | gcc | msvc | mingw ]` to build using specific toolchain
 
-- A basic `CMakeLists.txt` file is provided
+- a basic `CMakeLists.txt` file is provided

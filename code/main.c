@@ -788,7 +788,7 @@ RenderWorld (
 
 
 
-struct config { bool Error; int Width, Height, Samples, Depth; char* WorldFile; } typedef config;
+struct config { bool Error, Details; int Width, Height, Samples, Depth; char* WorldFile; } typedef config;
 
 internal config
 ParseArgs (
@@ -796,13 +796,14 @@ ParseArgs (
 	char** argv
 ) {
 	char* HelpMessage =
-		"Usage: rtic [options]                                   \n"
-		"    -?           - print this help message.             \n"
-		"    -w [width]   - set image width.       default:  160 \n"
-		"    -h [height]  - set image height.      default:   90 \n"
-		"    -s [samples] - set samples per pixel. default:    2 \n"
-		"    -d [depth]   - set max bounce depth.  default:   20 \n"
-		"    -f [file]    - load world from file.  default: none \n";
+		"Usage: rtic [options]                                           \n"
+		"    -?           - print this help message.                     \n"
+		"    -w [width]   - set image width.         default:        160 \n"
+		"    -h [height]  - set image height.        default:         90 \n"
+		"    -s [samples] - set samples per pixel.   default:          2 \n"
+		"    -d [depth]   - set max bounce depth.    default:         20 \n"
+		"    -f [file]    - load world from file.    default:       none \n"
+		"    -x           - use options in filename. default: output.png \n";
 
 	config Config = {
 		.Error     = false,
@@ -817,12 +818,13 @@ ParseArgs (
 	for ( int a = 1; a < argc; ++a ) {
 		char* arg = argv[a];
 
-		     if ( STRINGS_EQUAL( "-?", arg ) or a >= argc - 1 ) { Help  = true; break; }
+		     if ( STRINGS_EQUAL( "-?", arg ) ) {        Help      =       true; break; }
 		else if ( STRINGS_EQUAL( "-w", arg ) ) { Config.Width     = atoi( argv[++a] ); }
 		else if ( STRINGS_EQUAL( "-h", arg ) ) { Config.Height    = atoi( argv[++a] ); }
 		else if ( STRINGS_EQUAL( "-s", arg ) ) { Config.Samples   = atoi( argv[++a] ); }
 		else if ( STRINGS_EQUAL( "-d", arg ) ) { Config.Depth     = atoi( argv[++a] ); }
 		else if ( STRINGS_EQUAL( "-f", arg ) ) { Config.WorldFile =       argv[++a]  ; }
+		else if ( STRINGS_EQUAL( "-x", arg ) ) { Config.Details   =       true       ; }
 		else { Help = true; break; }
 	}
 
@@ -891,16 +893,25 @@ main (
 
 	RenderWorld( Image, World, Config.Samples, Config.Depth );
 
+	real RenderTime = (real) ( clock() - _Timer ) / CLOCKS_PER_SEC;
 	TIMER_STAMP( "RENDER  " );
 
 	{ // Save buffer to PNG file
-		// FIXME: UTF-8 support in any way?
-		//char Filename[ UCHAR_MAX ];
-		//stbiw_convert_wchar_to_utf8(
-		//	Filename, sizeof( Filename ),
-		//	L"output.png" );
+		char Filename[ UCHAR_MAX ];
+		if ( Config.Details ) {
+			sprintf(
+				Filename,
+				"w%d_h%d_s%d_d%d_%ds.png",
+				Config.Width, Config.Height,
+				Config.Samples,
+				Config.Depth,
+				(uint) RenderTime );
+		} else {
+			sprintf( Filename, "output.png" );
+		}
+		printf( "FILE    : %s\n", Filename );
 		stbi_write_png(
-			"output.png",
+			Filename,
 			Image.Width, Image.Height,
 			sizeof( rgba8 ),
 			Image.Buffer,

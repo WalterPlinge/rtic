@@ -741,7 +741,9 @@ RenderWorld (
 	real   Aperture   = 0.2;
 	camera Cam        = NewCamera( Position, Target, WorldUp, vfov, Aspect, Aperture );
 
-	for ( int y = 0; y < Image.Height; y += 1 ) {
+	int y;
+	#pragma omp parallel for
+	for ( y = 0; y < Image.Height; y += 1 ) {
 		rgba8* Row  = (rgba8*) ( (byte*) Image.Buffer + y * Image.Pitch );
 		for ( int x = 0; x < Image.Width; x += 1 ) {
 			rgba8* Pixel = Row + x;

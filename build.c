@@ -154,7 +154,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_RELEASE_FLAGS] = ""
 			" -ffast-math" // enables fast math
 			" -O3"         // level 3 optimisation
-			//" -fopenmp"    // TODO: openmp seems to be a major cause of slowdown, especially when printing progress
+			" -fopenmp"    // TODO: openmp seems to be a major cause of slowdown, especially when printing progress
 			,
 		[COMMAND_LINKER] = ""
 			" -L../libs/" // add library path
@@ -192,7 +192,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_RELEASE_FLAGS] = ""
 			" -ffast-math" // enables fast math
 			" -O3"         // level 3 optimisation
-			//" -fopenmp"    // openmp supprot
+			" -fopenmp"    // openmp support
 			,
 		[COMMAND_LINKER] = ""
 			" -L../libs/" // add library path
@@ -229,7 +229,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 		[COMMAND_RELEASE_FLAGS] = ""
 			" -ffast-math" // enables fast math
 			" -O3"         // level 3 optimisation
-			//" -fopenmp"    // openmp support
+			" -fopenmp"    // openmp support
 			,
 		[COMMAND_LINKER] = ""
 			" -L../libs/" // add library path
@@ -286,7 +286,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 			" -fp:fast" // Specifies how the compiler treats floating-point expressions, optimizations, and exceptions.
 			" -MT"      // Compiles to create a multithreaded executable file, by using LIBCMT.lib.
 			" -O2"      // Creates fast code.
-			//" -openmp"  // Enables #pragma omp in source code.
+			" -openmp"  // Enables #pragma omp in source code.
 			,
 		[COMMAND_LINKER] = ""
 			" -link"              // linker flag
@@ -332,7 +332,7 @@ global char* Strings[TOOLCHAIN_COUNT][COMMAND_COUNT] = {
 			,
 		[COMMAND_RELEASE_FLAGS] = ""
 			" -fp:FAST" // Set floating-point model PRECISE or FAST (default: PRECISE)
-			//" -openmp"  // Enable OpenMP 3.1 extensions
+			" -openmp"  // Enable OpenMP 3.1 extensions
 			" -Ot"      // Optimise (favouring: Os/Ot - space/speed)
 			" -Ox"      // Perform maximum optimisations
 			,
